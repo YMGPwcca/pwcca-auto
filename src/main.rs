@@ -1,7 +1,7 @@
-mod media;
-use std::{thread::sleep, time::Duration};
+mod mods;
 
-use media::*;
+use std::{thread::sleep, time::Duration};
+use mods::media::{change_default_output, get_all_outputs, get_current_output, is_discord_recording};
 
 fn main() {
   loop {

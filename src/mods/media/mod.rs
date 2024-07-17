@@ -1,4 +1,4 @@
-use crate::media::policy_config::com::ComInterfaceExt;
+use policy_config::com::ComInterfaceExt;
 use std::{
   ffi::OsString,
   iter::once,

@@ -10,6 +10,7 @@ use windows::{
   },
 };
 
+#[allow(dead_code)]
 fn get_dev_mode_a() -> DEVMODEA {
   unsafe {
     let mut dev_mode = std::mem::zeroed::<DEVMODEA>();
@@ -19,6 +20,7 @@ fn get_dev_mode_a() -> DEVMODEA {
   }
 }
 
+#[allow(dead_code)]
 pub fn get_all_frequencies() -> Vec<u32> {
   let mut frequency_vec = Vec::<u32>::new();
   unsafe {
@@ -41,10 +43,12 @@ pub fn get_all_frequencies() -> Vec<u32> {
   }
 }
 
+#[allow(dead_code)]
 pub fn get_current_frequency() -> u32 {
   return get_dev_mode_a().dmDisplayFrequency;
 }
 
+#[allow(dead_code)]
 pub fn set_new_frequency(mut frequency: u32) {
   if frequency < 60 {
     frequency = 60;
@@ -68,6 +72,7 @@ pub fn set_new_frequency(mut frequency: u32) {
   }
 }
 
+#[allow(dead_code)]
 pub fn turn_off_monitor() {
   unsafe {
     SendMessageA(

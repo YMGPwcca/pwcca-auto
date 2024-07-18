@@ -1,3 +1,5 @@
+mod policy_config;
+
 use policy_config::com::ComInterfaceExt;
 use std::{
   ffi::OsString,
@@ -14,12 +16,10 @@ use windows::{
       eCapture, eCommunications, eConsole, eRender, AudioSessionStateActive, IAudioSessionControl2,
       IAudioSessionManager2, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
     },
-    System::Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_ALL, STGM_READ},
+    System::Com::{CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ},
   },
 };
 use windows_core::PCWSTR;
-
-mod policy_config;
 
 #[derive(Clone)]
 pub struct Device {
@@ -35,12 +35,32 @@ impl PartialEq for Device {
     }
   }
 }
+impl Eq for Device {}
+
+static mut IS_INITIALIZED: bool = false;
+
+#[allow(dead_code)]
+pub fn init() {
+  unsafe {
+    let res = CoInitialize(Some(std::ptr::null()));
+    if res.is_ok() {
+      IS_INITIALIZED = true;
+    }
+  }
+}
+
+#[allow(dead_code)]
+fn init_check() {
+  if !unsafe { IS_INITIALIZED } {
+    panic!("CoInitialize has not been called. Consider calling `init` function.")
+  }
+}
 
 // Audio Input
 #[allow(dead_code)]
 pub fn get_current_input() -> Device {
   unsafe {
-    CoInitialize(Some(std::ptr::null())).unwrap();
+    init_check();
 
     let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
     let device = enumerator.GetDefaultAudioEndpoint(eCapture, eCommunications).unwrap();
@@ -48,8 +68,6 @@ pub fn get_current_input() -> Device {
     let property_store = device.OpenPropertyStore(STGM_READ).unwrap();
     let id = device.clone().GetId().unwrap();
     let name = property_store.GetValue(&PKEY_Device_FriendlyName).unwrap().to_string();
-
-    CoUninitialize();
 
     return Device {
       device_object: device,
@@ -62,7 +80,7 @@ pub fn get_current_input() -> Device {
 #[allow(dead_code)]
 pub fn change_default_output(device_id: PWSTR) {
   unsafe {
-    CoInitialize(Some(std::ptr::null())).unwrap();
+    init_check();
 
     let id = OsString::from_wide(device_id.as_wide());
     let raw_id = id.as_os_str().encode_wide().chain(once(0)).collect::<Vec<u16>>();
@@ -76,7 +94,7 @@ pub fn change_default_output(device_id: PWSTR) {
 #[allow(dead_code)]
 pub fn get_current_output() -> Device {
   unsafe {
-    CoInitialize(Some(std::ptr::null())).unwrap();
+    init_check();
 
     let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
     let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole).unwrap();
@@ -84,8 +102,6 @@ pub fn get_current_output() -> Device {
     let property_store = device.OpenPropertyStore(STGM_READ).unwrap();
     let id = device.clone().GetId().unwrap();
     let name = property_store.GetValue(&PKEY_Device_FriendlyName).unwrap().to_string();
-
-    CoUninitialize();
 
     return Device {
       device_object: device,
@@ -97,11 +113,10 @@ pub fn get_current_output() -> Device {
 
 #[allow(dead_code)]
 pub fn get_all_outputs() -> Vec<Device> {
+  init_check();
   let mut all_outputs = Vec::<Device>::new();
 
   unsafe {
-    CoInitialize(Some(std::ptr::null())).unwrap();
-
     let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
     let devices = enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE).unwrap();
     let count = devices.GetCount().unwrap();
@@ -118,19 +133,16 @@ pub fn get_all_outputs() -> Vec<Device> {
       })
     }
 
-    CoUninitialize();
-
     return all_outputs;
   }
 }
 
 #[allow(dead_code)]
 pub fn get_all_inputs() -> Vec<Device> {
-  let mut all_outputs = Vec::<Device>::new();
+  init_check();
+  let mut all_inputs = Vec::<Device>::new();
 
   unsafe {
-    CoInitialize(Some(std::ptr::null())).unwrap();
-
     let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
     let devices = enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE).unwrap();
     let count = devices.GetCount().unwrap();
@@ -140,25 +152,23 @@ pub fn get_all_inputs() -> Vec<Device> {
 
       let id = device.GetId().unwrap();
       let name = property_store.GetValue(&PKEY_Device_FriendlyName).unwrap().to_string();
-      all_outputs.push(Device {
+      all_inputs.push(Device {
         device_object: device,
         device_id: id,
         device_name: name,
       })
     }
 
-    CoUninitialize();
-
-    return all_outputs;
+    return all_inputs;
   }
 }
 
 #[allow(dead_code)]
 pub fn is_discord_recording() -> bool {
-  unsafe {
-    CoInitialize(Some(std::ptr::null())).unwrap();
+  init_check();
+  let microphone = get_current_input();
 
-    let microphone = get_current_input();
+  unsafe {
     let session_manager: IAudioSessionManager2 = microphone
       .device_object
       .Activate(CLSCTX_ALL, Some(std::ptr::null()))

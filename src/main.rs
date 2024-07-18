@@ -1,9 +1,11 @@
 mod mods;
 
+use mods::media::{change_default_output, get_all_outputs, get_current_output, init, is_discord_recording};
 use std::{thread::sleep, time::Duration};
-use mods::media::{change_default_output, get_all_outputs, get_current_output, is_discord_recording};
 
 fn main() {
+  init();
+
   loop {
     if is_discord_recording() {
       let current = get_current_output();
@@ -33,8 +35,8 @@ fn main() {
 
         change_default_output(outputs.get(0).unwrap().device_id);
       }
-
-      sleep(Duration::from_secs(1))
     }
+
+    sleep(Duration::from_secs(1))
   }
 }

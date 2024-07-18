@@ -28,12 +28,12 @@ fn main() {
 
         if current_output.device_type == "Headphones" {
           let outputs = get_all_outputs();
-          let headphones_only = outputs
+          let speakers_only = outputs
             .into_iter()
             .filter(|device| device.device_type == "Speakers")
             .collect::<Vec<Device>>();
 
-          change_default_output(headphones_only.first().unwrap().device_id);
+          change_default_output(speakers_only.first().unwrap().device_id);
         }
       }
     }

@@ -13,7 +13,7 @@ use windows::{
 #[allow(dead_code)]
 fn get_dev_mode_a() -> DEVMODEA {
   unsafe {
-    let mut dev_mode = std::mem::zeroed::<DEVMODEA>();
+    let mut dev_mode = std::mem::zeroed();
     let _ = EnumDisplaySettingsA(PSTR::null(), ENUM_CURRENT_SETTINGS, &mut dev_mode);
 
     return dev_mode;
@@ -24,7 +24,7 @@ fn get_dev_mode_a() -> DEVMODEA {
 pub fn get_all_frequencies() -> Vec<u32> {
   let mut frequency_vec = Vec::<u32>::new();
   unsafe {
-    let mut dev_mode = std::mem::zeroed::<DEVMODEA>();
+    let mut dev_mode = std::mem::zeroed();
     let mut index = 0;
 
     loop {

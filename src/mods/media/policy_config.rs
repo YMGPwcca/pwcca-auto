@@ -6,9 +6,7 @@ use std::ffi::c_void;
 use windows::core::{IUnknown, HRESULT};
 use windows::core::{IUnknown_Vtbl, Interface, Result, GUID, PCWSTR};
 use windows::Win32::Media::Audio::ERole;
-use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED};
-
-static mut COM_INITIALIZED: bool = false;
+use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 
 #[repr(transparent)]
 #[derive(Clone)]
@@ -17,13 +15,6 @@ impl IPolicyConfig {
   const CLASS_GUID: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
 
   pub fn new_instance() -> std::io::Result<Self> {
-    if !unsafe { COM_INITIALIZED } {
-      let init_result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok() };
-      if let Ok(()) = init_result {
-        unsafe { COM_INITIALIZED = true };
-      }
-    }
-
     let result = unsafe { CoCreateInstance(&Self::CLASS_GUID, None, CLSCTX_INPROC_SERVER) };
     result.map_err(Into::into)
   }

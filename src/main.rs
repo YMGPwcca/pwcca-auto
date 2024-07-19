@@ -28,18 +28,16 @@ fn main() {
 
         change_default_output(headphones_only.first().unwrap().device_id);
       }
-    } else {
-      if connected {
-        connected = false;
+    } else if connected {
+      connected = false;
 
-        if current_output.device_type == "Headphones" {
-          let speakers_only = all_outputs
-            .into_iter()
-            .filter(|device| device.device_type == "Speakers")
-            .collect::<Vec<Device>>();
+      if current_output.device_type == "Headphones" {
+        let speakers_only = all_outputs
+          .into_iter()
+          .filter(|device| device.device_type == "Speakers")
+          .collect::<Vec<Device>>();
 
-          change_default_output(speakers_only.first().unwrap().device_id);
-        }
+        change_default_output(speakers_only.first().unwrap().device_id);
       }
     }
 

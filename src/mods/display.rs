@@ -16,7 +16,7 @@ fn get_dev_mode_a() -> DEVMODEA {
     let mut dev_mode = std::mem::zeroed();
     let _ = EnumDisplaySettingsA(PSTR::null(), ENUM_CURRENT_SETTINGS, &mut dev_mode);
 
-    return dev_mode;
+    dev_mode
   }
 }
 
@@ -39,13 +39,13 @@ pub fn get_all_frequencies() -> Vec<u32> {
     }
 
     frequency_vec.sort();
-    return frequency_vec;
+    frequency_vec
   }
 }
 
 #[allow(dead_code)]
 pub fn get_current_frequency() -> u32 {
-  return get_dev_mode_a().dmDisplayFrequency;
+  get_dev_mode_a().dmDisplayFrequency
 }
 
 #[allow(dead_code)]
@@ -59,13 +59,13 @@ pub fn set_new_frequency(mut frequency: u32) {
     frequency = max_frequency;
   }
 
-  let mut dev_mode = DEVMODEA {
+  let dev_mode = DEVMODEA {
     dmDisplayFrequency: frequency,
     ..get_dev_mode_a()
   };
 
   unsafe {
-    let result = ChangeDisplaySettingsA(Some(&mut dev_mode), CDS_GLOBAL | CDS_UPDATEREGISTRY);
+    let result = ChangeDisplaySettingsA(Some(&dev_mode), CDS_GLOBAL | CDS_UPDATEREGISTRY);
     if result != DISP_CHANGE_SUCCESSFUL {
       panic!("[PCM] Unable to change display settings!");
     }
@@ -79,7 +79,7 @@ pub fn turn_off_monitor() {
       GetForegroundWindow(),
       WM_SYSCOMMAND,
       WPARAM(SC_MONITORPOWER as usize),
-      LPARAM(2 as isize),
+      LPARAM(2_isize),
     )
   };
 }

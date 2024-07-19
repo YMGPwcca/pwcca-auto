@@ -1,17 +1,11 @@
 mod policy_config;
 
-use std::{
-  ffi::OsString,
-  fmt::Display,
-  iter::once,
-  ops::Deref,
-  os::windows::ffi::{OsStrExt, OsStringExt},
-};
+use std::{fmt::Display, path::Path, str::FromStr};
 use windows::{
   core::{Interface, PCWSTR, PWSTR},
   Win32::{
     Devices::FunctionDiscovery::{PKEY_DeviceInterface_FriendlyName, PKEY_Device_DeviceDesc},
-    Foundation::{MAX_PATH, S_OK},
+    Foundation::{CloseHandle, MAX_PATH, S_OK},
     Media::Audio::{
       eCapture, eCommunications, eConsole, eRender, AudioSessionStateActive, IAudioSessionControl2,
       IAudioSessionManager2, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
@@ -81,12 +75,12 @@ pub fn get_default_input() -> Device {
       .unwrap()
       .to_string();
 
-    return Device {
+    Device {
       device_object: device,
       device_type,
       device_id,
       device_name,
-    };
+    }
   }
 }
 
@@ -106,12 +100,12 @@ pub fn get_default_output() -> Device {
       .unwrap()
       .to_string();
 
-    return Device {
+    Device {
       device_object: device,
       device_type,
       device_id,
       device_name,
-    };
+    }
   }
 }
 
@@ -143,7 +137,7 @@ pub fn get_all_outputs() -> Vec<Device> {
       })
     }
 
-    return all_outputs;
+    all_outputs
   }
 }
 
@@ -175,7 +169,7 @@ pub fn get_all_inputs() -> Vec<Device> {
       })
     }
 
-    return all_inputs;
+    all_inputs
   }
 }
 
@@ -184,35 +178,32 @@ pub fn change_default_output(device_id: PWSTR) {
   unsafe {
     init_check();
 
-    let id = OsString::from_wide(device_id.as_wide());
-    let raw_id = id.encode_wide().chain(once(0)).collect::<Vec<u16>>();
-
     let policy = policy_config::IPolicyConfig::new_instance().unwrap();
-    policy.SetDefaultEndpoint(PCWSTR(raw_id.as_ptr()), eConsole).unwrap()
+    policy.SetDefaultEndpoint(PCWSTR(device_id.as_ptr()), eConsole).unwrap()
   };
 }
 
 #[allow(dead_code)]
 fn get_process_name(process_id: u32) -> String {
   let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, false, process_id) }.unwrap();
-  if !h_process.is_invalid() {
-    let mut process_path_bits: [u8; MAX_PATH as usize] = [0; MAX_PATH as usize];
-    unsafe { GetProcessImageFileNameA(h_process, &mut process_path_bits) };
 
-    let size = process_path_bits.iter().position(|&c| c == b'\0').unwrap();
-    let process_path = String::from_utf8((&process_path_bits[0..size]).to_vec()).unwrap();
-    let process_name = String::from(
-      std::path::Path::new(&process_path)
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap(),
-    );
+  if !h_process.is_invalid() {
+    let mut process_path_buffer = [0; MAX_PATH as usize];
+    let byte_written = unsafe { GetProcessImageFileNameA(h_process, &mut process_path_buffer) as usize };
+
+    if byte_written == 0 {
+      return String::new();
+    };
+
+    let process_path = String::from_utf8(process_path_buffer[..byte_written].to_vec()).unwrap();
+    let process_name = String::from_str(Path::new(&process_path).file_name().unwrap().to_str().unwrap()).unwrap();
 
     return process_name;
   }
 
-  return "".to_owned();
+  unsafe { CloseHandle(h_process).unwrap() };
+
+  String::new()
 }
 
 #[allow(dead_code)]
@@ -227,23 +218,19 @@ pub fn list_all_programs(device_type: &DeviceType) -> Vec<String> {
   let mut result = Vec::<String>::new();
 
   init_check();
-  let device = if device_type.to_owned() == DeviceType::Input {
+  let device = if *device_type == DeviceType::Input {
     get_default_input()
   } else {
     get_default_output()
   };
 
   unsafe {
-    let session_manager: IAudioSessionManager2 = device
-      .device_object
-      .Activate(CLSCTX_ALL, None)
-      .unwrap();
+    let session_manager: IAudioSessionManager2 = device.device_object.Activate(CLSCTX_ALL, None).unwrap();
     let session_list = session_manager.GetSessionEnumerator().unwrap();
-    let session_count = session_list.GetCount().unwrap();
 
-    for i in 0..session_count {
+    for i in 0..session_list.GetCount().unwrap() {
       let session_control = session_list.GetSession(i).unwrap();
-      let session_control2: IAudioSessionControl2 = session_control.deref().cast().unwrap();
+      let session_control2: IAudioSessionControl2 = session_control.cast().unwrap();
 
       if session_control2.IsSystemSoundsSession() == S_OK {
         continue;
@@ -256,6 +243,6 @@ pub fn list_all_programs(device_type: &DeviceType) -> Vec<String> {
       }
     }
 
-    return result;
+    result
   }
 }

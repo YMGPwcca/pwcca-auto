@@ -4,6 +4,8 @@ use mods::media::{change_default_output, get_all_outputs, get_default_output, in
 use std::{thread::sleep, time::Duration};
 
 fn main() {
+  println!("Running PCM-Backend-Test");
+  
   init();
   let mut disconnect = false;
 

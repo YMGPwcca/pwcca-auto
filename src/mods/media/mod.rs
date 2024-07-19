@@ -1,6 +1,5 @@
 mod policy_config;
 
-use policy_config::com::ComInterfaceExt;
 use std::{
   ffi::OsString,
   fmt::Display,
@@ -9,7 +8,7 @@ use std::{
   os::windows::ffi::{OsStrExt, OsStringExt},
 };
 use windows::{
-  core::{Interface, PWSTR},
+  core::{Interface, PCWSTR, PWSTR},
   Win32::{
     Devices::FunctionDiscovery::{PKEY_DeviceInterface_FriendlyName, PKEY_Device_DeviceDesc},
     Foundation::{MAX_PATH, S_OK},
@@ -24,7 +23,6 @@ use windows::{
     },
   },
 };
-use windows_core::PCWSTR;
 
 static mut IS_INITIALIZED: bool = false;
 
@@ -200,11 +198,8 @@ fn get_process_name(process_id: u32) -> String {
   if !h_process.is_invalid() {
     let mut process_path_bits: [u8; MAX_PATH as usize] = [0; MAX_PATH as usize];
     unsafe { GetProcessImageFileNameA(h_process, &mut process_path_bits) };
-    let size = process_path_bits
-      .iter()
-      .position(|&c| c == b'\0')
-      .unwrap_or(process_path_bits.len());
 
+    let size = process_path_bits.iter().position(|&c| c == b'\0').unwrap();
     let process_path = String::from_utf8((&process_path_bits[0..size]).to_vec()).unwrap();
     let process_name = String::from(
       std::path::Path::new(&process_path)

@@ -12,7 +12,7 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct IPolicyConfig(pub IUnknown);
 impl IPolicyConfig {
-  pub fn new_instance() -> std::io::Result<Self> {
+  pub fn new() -> std::io::Result<Self> {
     let result = unsafe {
       CoCreateInstance(
         &GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9),

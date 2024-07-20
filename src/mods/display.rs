@@ -14,7 +14,7 @@ use windows::{
 fn get_dev_mode_a() -> DEVMODEA {
   unsafe {
     let mut dev_mode = std::mem::zeroed();
-    let _ = EnumDisplaySettingsA(PSTR::null(), ENUM_CURRENT_SETTINGS, &mut dev_mode);
+    EnumDisplaySettingsA(PSTR::null(), ENUM_CURRENT_SETTINGS, &mut dev_mode).unwrap();
 
     dev_mode
   }
@@ -78,8 +78,8 @@ pub fn turn_off_monitor() {
     SendMessageA(
       GetForegroundWindow(),
       WM_SYSCOMMAND,
-      WPARAM(SC_MONITORPOWER as usize),
-      LPARAM(2_isize),
+      WPARAM(SC_MONITORPOWER.try_into().unwrap()),
+      LPARAM(2isize),
     )
   };
 }

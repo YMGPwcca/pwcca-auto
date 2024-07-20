@@ -18,8 +18,6 @@ use windows::{
   },
 };
 
-static mut IS_INITIALIZED: bool = false;
-
 #[derive(Clone)]
 pub struct Device {
   device_object: IMMDevice,
@@ -43,7 +41,20 @@ impl Display for Device {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, PartialEq, Eq)]
+pub enum DeviceType {
+  Input,
+  Output,
+}
+
+static mut IS_INITIALIZED: bool = false;
+
+#[allow(dead_code)]
 pub fn init() {
+  if unsafe { IS_INITIALIZED } {
+    return;
+  }
+
   unsafe {
     let res = CoInitialize(None);
     if res.is_ok() {
@@ -60,15 +71,10 @@ fn init_check() {
 }
 
 #[allow(dead_code)]
-pub fn get_default_input() -> Device {
+fn get_device_info(device: &IMMDevice) -> Device {
   unsafe {
-    init_check();
-
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
-    let device = enumerator.GetDefaultAudioEndpoint(eCapture, eCommunications).unwrap();
-
     let property_store = device.OpenPropertyStore(STGM_READ).unwrap();
-    let device_id = device.clone().GetId().unwrap();
+    let device_id = device.GetId().unwrap();
     let device_type = property_store.GetValue(&PKEY_Device_DeviceDesc).unwrap().to_string();
     let device_name = property_store
       .GetValue(&PKEY_DeviceInterface_FriendlyName)
@@ -76,100 +82,47 @@ pub fn get_default_input() -> Device {
       .to_string();
 
     Device {
-      device_object: device,
-      device_type,
+      device_object: device.clone(),
       device_id,
+      device_type,
       device_name,
     }
   }
 }
 
 #[allow(dead_code)]
-pub fn get_default_output() -> Device {
+pub fn get_default_device(device_type: &DeviceType) -> Device {
+  init_check();
+
   unsafe {
-    init_check();
-
     let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
-    let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole).unwrap();
+    let device = match device_type {
+      DeviceType::Input => enumerator.GetDefaultAudioEndpoint(eCapture, eCommunications).unwrap(),
+      DeviceType::Output => enumerator.GetDefaultAudioEndpoint(eRender, eConsole).unwrap(),
+    };
 
-    let property_store = device.OpenPropertyStore(STGM_READ).unwrap();
-    let device_id = device.clone().GetId().unwrap();
-    let device_type = property_store.GetValue(&PKEY_Device_DeviceDesc).unwrap().to_string();
-    let device_name = property_store
-      .GetValue(&PKEY_DeviceInterface_FriendlyName)
-      .unwrap()
-      .to_string();
-
-    Device {
-      device_object: device,
-      device_type,
-      device_id,
-      device_name,
-    }
+    get_device_info(&device)
   }
 }
 
 #[allow(dead_code)]
-pub fn get_all_outputs() -> Vec<Device> {
+pub fn get_all_devices(device_type: &DeviceType) -> Vec<Device> {
   init_check();
-  let mut all_outputs = Vec::<Device>::new();
+
+  let mut all_devices = Vec::<Device>::new();
 
   unsafe {
     let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
-    let devices = enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE).unwrap();
-    let count = devices.GetCount().unwrap();
-    for i in 0..count {
+    let devices = match device_type {
+      DeviceType::Input => enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE).unwrap(),
+      DeviceType::Output => enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE).unwrap(),
+    };
+    for i in 0..devices.GetCount().unwrap() {
       let device = devices.Item(i).unwrap();
-      let property_store = device.OpenPropertyStore(STGM_READ).unwrap();
-
-      let device_id = device.GetId().unwrap();
-      let device_type = property_store.GetValue(&PKEY_Device_DeviceDesc).unwrap().to_string();
-      let device_name = property_store
-        .GetValue(&PKEY_DeviceInterface_FriendlyName)
-        .unwrap()
-        .to_string();
-
-      all_outputs.push(Device {
-        device_object: device,
-        device_type,
-        device_id,
-        device_name,
-      })
+      all_devices.push(get_device_info(&device));
     }
 
-    all_outputs
-  }
-}
-
-#[allow(dead_code)]
-pub fn get_all_inputs() -> Vec<Device> {
-  init_check();
-  let mut all_inputs = Vec::<Device>::new();
-
-  unsafe {
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).unwrap();
-    let devices = enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE).unwrap();
-    let count = devices.GetCount().unwrap();
-    for i in 0..count {
-      let device = devices.Item(i).unwrap();
-      let property_store = device.OpenPropertyStore(STGM_READ).unwrap();
-
-      let device_id = device.GetId().unwrap();
-      let device_type = property_store.GetValue(&PKEY_Device_DeviceDesc).unwrap().to_string();
-      let device_name = property_store
-        .GetValue(&PKEY_DeviceInterface_FriendlyName)
-        .unwrap()
-        .to_string();
-
-      all_inputs.push(Device {
-        device_object: device,
-        device_type,
-        device_id,
-        device_name,
-      })
-    }
-
-    all_inputs
+    all_devices
   }
 }
 
@@ -178,7 +131,7 @@ pub fn change_default_output(device_id: PWSTR) {
   unsafe {
     init_check();
 
-    let policy = policy_config::IPolicyConfig::new_instance().unwrap();
+    let policy = policy_config::IPolicyConfig::new().unwrap();
     policy.SetDefaultEndpoint(PCWSTR(device_id.as_ptr()), eConsole).unwrap()
   };
 }
@@ -189,13 +142,13 @@ fn get_process_name(process_id: u32) -> String {
 
   if !h_process.is_invalid() {
     let mut process_path_buffer = [0; MAX_PATH as usize];
-    let byte_written = unsafe { GetProcessImageFileNameA(h_process, &mut process_path_buffer) as usize };
+    let byte_written = unsafe { GetProcessImageFileNameA(h_process, &mut process_path_buffer) };
 
     if byte_written == 0 {
       return String::new();
     };
 
-    let process_path = String::from_utf8(process_path_buffer[..byte_written].to_vec()).unwrap();
+    let process_path = String::from_utf8(process_path_buffer[..byte_written as usize].to_vec()).unwrap();
     let process_name = String::from_str(Path::new(&process_path).file_name().unwrap().to_str().unwrap()).unwrap();
 
     return process_name;
@@ -207,22 +160,11 @@ fn get_process_name(process_id: u32) -> String {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DeviceType {
-  Input,
-  Output,
-}
-
-#[allow(dead_code)]
 pub fn list_all_programs(device_type: &DeviceType) -> Vec<String> {
-  let mut result = Vec::<String>::new();
-
   init_check();
-  let device = if *device_type == DeviceType::Input {
-    get_default_input()
-  } else {
-    get_default_output()
-  };
+
+  let mut result = Vec::<String>::new();
+  let device = get_default_device(device_type);
 
   unsafe {
     let session_manager: IAudioSessionManager2 = device.device_object.Activate(CLSCTX_ALL, None).unwrap();

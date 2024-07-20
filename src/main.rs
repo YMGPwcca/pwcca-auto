@@ -1,6 +1,8 @@
 mod mods;
 
-use mods::media::{change_default_output, get_all_outputs, get_default_output, init, list_all_programs, Device};
+use mods::media::{
+  change_default_output, get_all_devices, get_default_device, init, list_all_programs, Device, DeviceType,
+};
 use std::{thread::sleep, time::Duration};
 
 fn main() {
@@ -10,14 +12,14 @@ fn main() {
   let mut connected = false;
 
   loop {
-    let current_output = get_default_output();
-    let all_outputs = get_all_outputs();
+    let current_output = get_default_device(&DeviceType::Output);
+    let all_outputs = get_all_devices(&DeviceType::Output);
 
     if all_outputs.len() < 2 {
       continue;
     }
 
-    if list_all_programs(&mods::media::DeviceType::Input).contains(&"Discord.exe".to_owned()) {
+    if list_all_programs(&DeviceType::Input).contains(&String::from("Discord.exe")) {
       connected = true;
 
       if current_output.device_type == "Speakers" {

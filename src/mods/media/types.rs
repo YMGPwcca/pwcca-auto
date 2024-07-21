@@ -1,6 +1,9 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::Display;
 
-use windows::{core::PWSTR, Win32::Media::Audio::IMMDevice};
+use windows::{
+  core::{Error as wError, PWSTR},
+  Win32::Media::Audio::IMMDevice,
+};
 
 #[derive(Debug)]
 pub struct Device {
@@ -21,43 +24,40 @@ pub enum DeviceType {
   Output,
 }
 
-#[derive(Debug)]
-pub enum AudioDeviceError {
+#[derive(Clone, Copy, Debug)]
+pub enum ErrorEnum {
+  NotInitialized,
+
   InitializationFailed,
-  DeviceNotFound,
-  GetDeviceCollectionFailed,
-  GetDeviceIdFailed,
   OpenPropertyStoreFailed,
   GetPropertyStoreValueFailed,
+  GetDeviceIdFailed,
+  DeviceNotFound,
+  GetDeviceCollectionFailed,
   SetDefaultEndpointFailed,
-
   CreateCOMObjectFailed,
   GetSessionEnumeratorFailed,
   GetSessionFailed,
-  CastFailed,
 
+  CastFailed,
   GetStateFailed,
   GetProcessIdFailed,
 }
 
-impl Display for AudioDeviceError {
-  fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-    match self {
-      AudioDeviceError::InitializationFailed => write!(f, "Failed to initialize audio device"),
-      AudioDeviceError::DeviceNotFound => write!(f, "Audio device not found"),
-      AudioDeviceError::GetDeviceCollectionFailed => write!(f, "Failed to get device collection"),
-      AudioDeviceError::GetDeviceIdFailed => write!(f, "Failed to get device ID"),
-      AudioDeviceError::OpenPropertyStoreFailed => write!(f, "Failed to open property store"),
-      AudioDeviceError::GetPropertyStoreValueFailed => write!(f, "Failed to get property store value"),
-      AudioDeviceError::SetDefaultEndpointFailed => write!(f, "Failed to set default endpoint"),
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct AudioDeviceError {
+  kind: ErrorEnum,
+  error: String,
+}
 
-      AudioDeviceError::CreateCOMObjectFailed => write!(f, "Failed to create COM object"),
-      AudioDeviceError::GetSessionEnumeratorFailed => write!(f, "Failed to get session enumerator"),
-      AudioDeviceError::GetSessionFailed => write!(f, "Failed to get session"),
-      AudioDeviceError::CastFailed => write!(f, "Failed to cast interface"),
+#[allow(dead_code)]
+impl AudioDeviceError {
+  pub fn new(kind: ErrorEnum, error: wError) -> Self {
+    Self { kind, error: error.message() }
+  }
 
-      AudioDeviceError::GetStateFailed => write!(f, "Failed to get state"),
-      AudioDeviceError::GetProcessIdFailed => write!(f, "Failed to get process ID"),
-    }
+  pub fn new_with_message(kind: ErrorEnum, error: String) -> Self {
+    Self { kind, error }
   }
 }

@@ -32,22 +32,16 @@ fn main() -> Result<(), AudioDeviceError> {
 
         // Switch to headphones if Discord is recording and speakers are the default
         if current_output.device_type == "Speakers" {
-          if let Some(headphones) = all_outputs.iter().find(|device| device.device_type == "Headphones") {
-            if let Err(e) = change_default_output(headphones.device_id) {
-              println!("Error changing default output device: {}", e);
-            }
-          }
+          let headphones = all_outputs.iter().find(|device| device.device_type == "Headphones").unwrap();
+          change_default_output(headphones.device_id)?
         }
       } else if connected {
         connected = false;
 
         // Switch back to speakers if Discord is not recording and headphones are the default
         if current_output.device_type == "Headphones" {
-          if let Some(speakers) = all_outputs.iter().find(|device| device.device_type == "Speakers") {
-            if let Err(e) = change_default_output(speakers.device_id) {
-              println!("Error changing default output device: {}", e);
-            }
-          }
+          let headphones = all_outputs.iter().find(|device| device.device_type == "Speakers").unwrap();
+          change_default_output(headphones.device_id)?
         }
       }
     }

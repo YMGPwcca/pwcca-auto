@@ -13,14 +13,10 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 pub struct IPolicyConfig(pub IUnknown);
 impl IPolicyConfig {
   pub fn new() -> std::io::Result<Self> {
-    let result = unsafe {
-      CoCreateInstance(
-        &GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9),
-        None,
-        CLSCTX_INPROC_SERVER,
-      )
-    };
-    result.map_err(Into::into)
+    unsafe {
+      CoCreateInstance(&GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9), None, CLSCTX_INPROC_SERVER).map_err(Into::into)
+      // .map(Self)
+    }
   }
 
   pub unsafe fn SetDefaultEndpoint(&self, device_id: PCWSTR, e_role: ERole) -> Result<()> {

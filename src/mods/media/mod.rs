@@ -24,14 +24,14 @@ static mut IS_INITIALIZED: bool = false;
 
 #[allow(dead_code)]
 pub fn init() -> Result<(), AudioDeviceError> {
-  if unsafe { IS_INITIALIZED } {
-    return Ok(());
-  }
-
   unsafe {
+    if IS_INITIALIZED {
+      return Ok(());
+    }
+
     let res = CoInitialize(None);
     if res.is_err() {
-      return Err(AudioDeviceError::InitializationFailed);
+      return Err(AudioDeviceError::new(ErrorEnum::InitializationFailed, res.into()));
     }
     IS_INITIALIZED = true;
     Ok(())
@@ -39,21 +39,25 @@ pub fn init() -> Result<(), AudioDeviceError> {
 }
 
 #[allow(dead_code)]
-fn init_check() {
+fn init_check() -> Result<(), AudioDeviceError> {
   if !unsafe { IS_INITIALIZED } {
-    panic!("[PCM] CoInitialize has not been called. Consider calling `init` function.")
+    return Err(AudioDeviceError::new_with_message(ErrorEnum::NotInitialized, "Audio device not initialized.".to_string()));
   }
+  Ok(())
 }
 
 #[allow(dead_code)]
 fn get_device_info(device: &IMMDevice) -> Result<Device, AudioDeviceError> {
   unsafe {
-    let property_store = device.OpenPropertyStore(STGM_READ).map_err(|_| AudioDeviceError::OpenPropertyStoreFailed)?;
-    let device_id = device.GetId().map_err(|_| AudioDeviceError::GetDeviceIdFailed)?;
-    let device_type = property_store.GetValue(&PKEY_Device_DeviceDesc).map_err(|_| AudioDeviceError::GetPropertyStoreValueFailed)?.to_string();
+    let property_store = device.OpenPropertyStore(STGM_READ).map_err(|e| AudioDeviceError::new(ErrorEnum::OpenPropertyStoreFailed, e))?;
+    let device_id = device.GetId().map_err(|e| AudioDeviceError::new(ErrorEnum::GetDeviceIdFailed, e))?;
+    let device_type = property_store
+      .GetValue(&PKEY_Device_DeviceDesc)
+      .map_err(|e| AudioDeviceError::new(ErrorEnum::GetPropertyStoreValueFailed, e))?
+      .to_string();
     let device_name = property_store
       .GetValue(&PKEY_DeviceInterface_FriendlyName)
-      .map_err(|_| AudioDeviceError::GetPropertyStoreValueFailed)?
+      .map_err(|e| AudioDeviceError::new(ErrorEnum::GetPropertyStoreValueFailed, e))?
       .to_string();
 
     Ok(Device {
@@ -67,13 +71,15 @@ fn get_device_info(device: &IMMDevice) -> Result<Device, AudioDeviceError> {
 
 #[allow(dead_code)]
 pub fn get_default_device(device_type: &DeviceType) -> Result<Device, AudioDeviceError> {
-  init_check();
+  init_check()?;
 
   unsafe {
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|_| AudioDeviceError::InitializationFailed)?;
+    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| AudioDeviceError::new(ErrorEnum::InitializationFailed, e))?;
     let device = match device_type {
-      DeviceType::Input => enumerator.GetDefaultAudioEndpoint(eCapture, eCommunications).map_err(|_| AudioDeviceError::DeviceNotFound)?,
-      DeviceType::Output => enumerator.GetDefaultAudioEndpoint(eRender, eConsole).map_err(|_| AudioDeviceError::DeviceNotFound)?,
+      DeviceType::Input => enumerator
+        .GetDefaultAudioEndpoint(eCapture, eCommunications)
+        .map_err(|e| AudioDeviceError::new(ErrorEnum::DeviceNotFound, e))?,
+      DeviceType::Output => enumerator.GetDefaultAudioEndpoint(eRender, eConsole).map_err(|e| AudioDeviceError::new(ErrorEnum::DeviceNotFound, e))?,
     };
 
     get_device_info(&device)
@@ -82,18 +88,22 @@ pub fn get_default_device(device_type: &DeviceType) -> Result<Device, AudioDevic
 
 #[allow(dead_code)]
 pub fn enumerate_audio_devices(device_type: &DeviceType) -> Result<Vec<Device>, AudioDeviceError> {
-  init_check();
+  init_check()?;
 
   let mut all_devices = Vec::<Device>::new();
 
   unsafe {
-    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|_| AudioDeviceError::InitializationFailed)?;
+    let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL).map_err(|e| AudioDeviceError::new(ErrorEnum::InitializationFailed, e))?;
     let devices = match device_type {
-      DeviceType::Input => enumerator.EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE).map_err(|_| AudioDeviceError::GetDeviceCollectionFailed)?,
-      DeviceType::Output => enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE).map_err(|_| AudioDeviceError::GetDeviceCollectionFailed)?,
+      DeviceType::Input => enumerator
+        .EnumAudioEndpoints(eCapture, DEVICE_STATE_ACTIVE)
+        .map_err(|e| AudioDeviceError::new(ErrorEnum::GetDeviceCollectionFailed, e))?,
+      DeviceType::Output => enumerator
+        .EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
+        .map_err(|e| AudioDeviceError::new(ErrorEnum::GetDeviceCollectionFailed, e))?,
     };
     for i in 0..devices.GetCount().unwrap() {
-      let device = devices.Item(i).map_err(|_| AudioDeviceError::DeviceNotFound)?;
+      let device = devices.Item(i).map_err(|e| AudioDeviceError::new(ErrorEnum::DeviceNotFound, e))?;
       all_devices.push(get_device_info(&device)?);
     }
 
@@ -104,59 +114,64 @@ pub fn enumerate_audio_devices(device_type: &DeviceType) -> Result<Vec<Device>, 
 #[allow(dead_code)]
 pub fn change_default_output(device_id: PWSTR) -> Result<(), AudioDeviceError> {
   unsafe {
-    init_check();
+    init_check()?;
 
-    let policy = policy_config::IPolicyConfig::new().map_err(|_| AudioDeviceError::InitializationFailed)?;
-    policy.SetDefaultEndpoint(PCWSTR(device_id.as_ptr()), eConsole).map_err(|_| AudioDeviceError::SetDefaultEndpointFailed)
+    let policy = policy_config::IPolicyConfig::new().map_err(|e| AudioDeviceError::new(ErrorEnum::InitializationFailed, e.into()))?;
+    policy
+      .SetDefaultEndpoint(PCWSTR(device_id.as_ptr()), eConsole)
+      .map_err(|e| AudioDeviceError::new(ErrorEnum::SetDefaultEndpointFailed, e))
   }
 }
 
 #[allow(dead_code)]
-fn get_process_name(process_id: u32) -> String {
-  let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, false, process_id) }.unwrap();
+fn get_process_name(process_id: u32) -> Result<String, AudioDeviceError> {
+  let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, false, process_id) }.unwrap_or_default();
 
   if !h_process.is_invalid() {
     let mut process_path_buffer = [0; MAX_PATH as usize];
     let byte_written = unsafe { GetProcessImageFileNameA(h_process, &mut process_path_buffer) };
 
     if byte_written == 0 {
-      return String::new();
+      return Ok(String::new());
     };
 
     let process_path = String::from_utf8(process_path_buffer[..byte_written as usize].to_vec()).unwrap_or_default();
     let process_name = String::from_str(Path::new(&process_path).file_name().unwrap_or_default().to_str().unwrap_or_default()).unwrap_or_default();
 
-    return process_name;
+    return Ok(process_name);
   }
 
   unsafe { CloseHandle(h_process).unwrap() };
 
-  String::new()
+  Ok(String::new())
 }
 
 #[allow(dead_code)]
 pub fn get_active_audio_applications(device_type: &DeviceType) -> Result<Vec<String>, AudioDeviceError> {
-  init_check();
+  init_check()?;
 
   let mut result = Vec::<String>::new();
   let device = get_default_device(device_type)?;
 
   unsafe {
-    let session_manager: IAudioSessionManager2 = device.device_object.Activate(CLSCTX_ALL, None).map_err(|_| AudioDeviceError::CreateCOMObjectFailed)?;
-    let session_list = session_manager.GetSessionEnumerator().map_err(|_| AudioDeviceError::GetSessionEnumeratorFailed)?;
+    let session_manager: IAudioSessionManager2 = device
+      .device_object
+      .Activate(CLSCTX_ALL, None)
+      .map_err(|e| AudioDeviceError::new(ErrorEnum::CreateCOMObjectFailed, e))?;
+    let session_list = session_manager.GetSessionEnumerator().map_err(|e| AudioDeviceError::new(ErrorEnum::GetSessionEnumeratorFailed, e))?;
 
     for i in 0..session_list.GetCount().unwrap() {
-      let session_control = session_list.GetSession(i).map_err(|_| AudioDeviceError::GetSessionFailed)?;
-      let session_control2: IAudioSessionControl2 = session_control.cast().map_err(|_| AudioDeviceError::CastFailed)?;
+      let session_control = session_list.GetSession(i).map_err(|e| AudioDeviceError::new(ErrorEnum::GetSessionFailed, e))?;
+      let session_control2: IAudioSessionControl2 = session_control.cast().map_err(|e| AudioDeviceError::new(ErrorEnum::CastFailed, e))?;
 
       if session_control2.IsSystemSoundsSession() == S_OK {
         continue;
       }
 
-      let state = session_control2.GetState().map_err(|_| AudioDeviceError::GetStateFailed)?;
+      let state = session_control2.GetState().map_err(|e| AudioDeviceError::new(ErrorEnum::GetStateFailed, e))?;
       if state == AudioSessionStateActive {
-        let instance_id = session_control2.GetProcessId().map_err(|_| AudioDeviceError::GetProcessIdFailed)?;
-        result.push(get_process_name(instance_id));
+        let instance_id = session_control2.GetProcessId().map_err(|e| AudioDeviceError::new(ErrorEnum::GetProcessIdFailed, e))?;
+        result.push(get_process_name(instance_id)?);
       }
     }
 

@@ -25,10 +25,7 @@ impl Network {
         _ => format!("Unknown ({:?})", network.dot11BssType),
       },
 
-      name: String::from_utf8_lossy(
-        &network.dot11Ssid.ucSSID[..network.dot11Ssid.uSSIDLength as usize],
-      )
-      .to_string(),
+      name: String::from_utf8_lossy(&network.dot11Ssid.ucSSID[..network.dot11Ssid.uSSIDLength as usize]).to_string(),
 
       signal_quality: network.wlanSignalQuality,
 
@@ -77,41 +74,35 @@ impl Network {
       },
 
       // https://en.wikipedia.org/wiki/IEEE_802.11
-      ratio_type: Vec::from_iter(
-        network.dot11PhyTypes[..network.uNumberOfPhyTypes as usize].iter(),
-      )
-      .iter()
-      .map(|&e| match *e {
-        WiFi::dot11_phy_type_unknown => "Unknown".to_string(),
-        WiFi::dot11_phy_type_fhss => "802.11 FHSS".to_string(),
-        WiFi::dot11_phy_type_dsss => "802.11 DSSS".to_string(),
-        WiFi::dot11_phy_type_irbaseband => "IR Baseband".to_string(),
-        WiFi::dot11_phy_type_ofdm => "802.11a".to_string(),
-        WiFi::dot11_phy_type_hrdsss => "802.11b".to_string(),
-        WiFi::dot11_phy_type_erp => "802.11g".to_string(),
-        WiFi::dot11_phy_type_ht => "802.11n".to_string(),
-        WiFi::dot11_phy_type_vht => "802.11ac".to_string(),
-        WiFi::dot11_phy_type_he => "802.11ax".to_string(),
-        WiFi::dot11_phy_type_eht => "802.11be".to_string(),
-        _ => format!("Unknown ({:?})", e),
-      })
-      .collect(),
+      ratio_type: Vec::from_iter(network.dot11PhyTypes[..network.uNumberOfPhyTypes as usize].iter())
+        .iter()
+        .map(|&e| match *e {
+          WiFi::dot11_phy_type_unknown => "Unknown".to_string(),
+          WiFi::dot11_phy_type_fhss => "802.11 FHSS".to_string(),
+          WiFi::dot11_phy_type_dsss => "802.11 DSSS".to_string(),
+          WiFi::dot11_phy_type_irbaseband => "IR Baseband".to_string(),
+          WiFi::dot11_phy_type_ofdm => "802.11a".to_string(),
+          WiFi::dot11_phy_type_hrdsss => "802.11b".to_string(),
+          WiFi::dot11_phy_type_erp => "802.11g".to_string(),
+          WiFi::dot11_phy_type_ht => "802.11n".to_string(),
+          WiFi::dot11_phy_type_vht => "802.11ac".to_string(),
+          WiFi::dot11_phy_type_he => "802.11ax".to_string(),
+          WiFi::dot11_phy_type_eht => "802.11be".to_string(),
+          _ => format!("Unknown ({:?})", e),
+        })
+        .collect(),
 
       // https://en.wikipedia.org/wiki/List_of_WLAN_channels
       bands: {
         let mut map: Vec<f32> = bss_entries
           .iter()
           .map(|&e| {
-            let freq_in_mhz = format!("{:.1}", e.ulChCenterFrequency / 1_000)
-              .parse::<i32>()
-              .unwrap();
+            let freq_in_mhz = format!("{:.1}", e.ulChCenterFrequency / 1_000).parse::<i32>().unwrap();
             match freq_in_mhz {
               2401..=2495 => 2.4,
               5150..=5895 => 5.0,
               5925..=7125 => 6.0,
-              _ => format!("{:.1}", freq_in_mhz as f32 / 1_000.0)
-                .parse::<f32>()
-                .unwrap(),
+              _ => format!("{:.1}", freq_in_mhz as f32 / 1_000.0).parse::<f32>().unwrap(),
             }
           })
           .collect();

@@ -114,10 +114,5 @@ pub fn get_available_networks() -> Result<Vec<Network>, WlanHandlerError> {
 
   unsafe { WlanCloseHandle(handle, None) };
 
-  return Ok(network_list);
-}
-
-#[test]
-fn test() {
-  println!("{:?}", get_available_networks().unwrap());
+  Ok(network_list)
 }

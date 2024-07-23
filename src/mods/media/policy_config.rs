@@ -14,8 +14,12 @@ pub struct IPolicyConfig(pub IUnknown);
 impl IPolicyConfig {
   pub fn new() -> std::io::Result<Self> {
     unsafe {
-      CoCreateInstance(&GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9), None, CLSCTX_INPROC_SERVER).map_err(Into::into)
-      // .map(Self)
+      CoCreateInstance(
+        &GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9),
+        None,
+        CLSCTX_INPROC_SERVER,
+      )
+      .map_err(Into::into)
     }
   }
 
@@ -34,5 +38,6 @@ unsafe impl Interface for IPolicyConfig {
 pub struct IPolicyConfig_Vtbl {
   pub base__: IUnknown_Vtbl,
   padding: [*const c_void; 10],
-  pub SetDefaultEndpoint: unsafe extern "system" fn(this: *mut c_void, wszDeviceId: PCWSTR, eRole: ERole) -> HRESULT,
+  pub SetDefaultEndpoint:
+    unsafe extern "system" fn(this: *mut c_void, wszDeviceId: PCWSTR, eRole: ERole) -> HRESULT,
 }

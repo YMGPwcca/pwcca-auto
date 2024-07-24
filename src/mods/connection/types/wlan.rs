@@ -2,7 +2,7 @@ use windows::Win32::NetworkManagement::WiFi::{self, WLAN_AVAILABLE_NETWORK, WLAN
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct Network {
+pub struct WLAN {
   pub kind: String,
   pub name: String,
   pub signal_quality: u32,
@@ -15,7 +15,7 @@ pub struct Network {
 }
 
 #[allow(dead_code)]
-impl Network {
+impl WLAN {
   pub fn new(network: &WLAN_AVAILABLE_NETWORK, bss_entries: Vec<WLAN_BSS_ENTRY>) -> Self {
     Self {
       kind: match network.dot11BssType {

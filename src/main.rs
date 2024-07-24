@@ -4,12 +4,25 @@ use mods::media::{
   change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
   types::{device::DeviceType, error::AudioDeviceError},
 };
-use std::{thread::sleep, time::Duration};
+use std::time::Duration;
 
-fn main() -> Result<(), AudioDeviceError> {
+fn main() {
   println!("Running PCM-Backend-Test");
 
-  // Initialize the audio device
+  let media = std::thread::spawn(move || media_thread());
+  let connection = std::thread::spawn(move || connection_thread());
+  let power = std::thread::spawn(move || power_thread());
+
+  let _ = media.join();
+  let _ = connection.join();
+  let _ = power.join();
+}
+
+#[allow(dead_code)]
+fn media_thread() -> Result<(), AudioDeviceError> {
+  // Initialize the media thread
+  println!("  + Running Media Thread");
+
   init()?;
 
   let mut connected = false;
@@ -48,6 +61,29 @@ fn main() -> Result<(), AudioDeviceError> {
       }
     }
 
-    sleep(Duration::from_secs(1));
+    // println!("LOG FROM MEDIA THREAD");
+    std::thread::sleep(Duration::from_secs(1));
+  }
+}
+
+#[allow(dead_code)]
+fn connection_thread() -> Result<(), AudioDeviceError> {
+  // Initialize the connection thread
+  println!("  + Running Connection Thread");
+
+  loop {
+    // println!("LOG FROM CONNECTION THREAD");
+    std::thread::sleep(Duration::from_secs(1));
+  }
+}
+
+#[allow(dead_code)]
+fn power_thread() -> Result<(), AudioDeviceError> {
+  // Initialize the power thread
+  println!("  + Running Power Thread");
+
+  loop {
+    // println!("LOG FROM POWER THREAD");
+    std::thread::sleep(Duration::from_secs(1));
   }
 }

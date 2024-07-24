@@ -1,11 +1,18 @@
 pub(crate) mod types;
 
-use types::{error::WlanHandlerError, network::Network};
+use types::{error::WlanHandlerError, wlan::WLAN};
 use windows::Win32::{
   Foundation::{ERROR_SUCCESS, HANDLE, WIN32_ERROR},
-  NetworkManagement::WiFi::{
-    WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetNetworkBssList, WlanOpenHandle,
-    WLAN_AVAILABLE_NETWORK, WLAN_BSS_ENTRY, WLAN_INTERFACE_INFO,
+  NetworkManagement::{
+    IpHelper::{
+      GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST,
+      IP_ADAPTER_ADDRESSES_LH,
+    },
+    Ndis::IfOperStatusUp,
+    WiFi::{
+      WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetNetworkBssList, WlanOpenHandle,
+      WLAN_AVAILABLE_NETWORK, WLAN_BSS_ENTRY, WLAN_INTERFACE_INFO,
+    },
   },
 };
 
@@ -96,8 +103,8 @@ fn get_network_bss_list(
 }
 
 #[allow(dead_code)]
-pub fn get_available_networks() -> Result<Vec<Network>, WlanHandlerError> {
-  let mut network_list: Vec<Network> = Vec::new();
+pub fn get_available_networks() -> Result<Vec<WLAN>, WlanHandlerError> {
+  let mut network_list: Vec<WLAN> = Vec::new();
 
   let handle = open_handle()?;
 
@@ -108,11 +115,48 @@ pub fn get_available_networks() -> Result<Vec<Network>, WlanHandlerError> {
     }
 
     for network in get_available_network_list.unwrap() {
-      network_list.push(Network::new(&network, get_network_bss_list(&handle, &interface, &network)?));
+      network_list.push(WLAN::new(&network, get_network_bss_list(&handle, &interface, &network)?));
     }
   }
 
   unsafe { WlanCloseHandle(handle, None) };
 
   Ok(network_list)
+}
+
+#[allow(dead_code)]
+pub fn is_ethernet_plugged_in() -> bool {
+  let mut is_plugged_in = false;
+
+  unsafe {
+    // https://docs.microsoft.com/en-us/windows/desktop/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
+    let mut buf_len: core::ffi::c_ulong = 16384;
+    let mut adapters_addresses_buffer = Vec::with_capacity(buf_len as usize);
+
+    let result = WIN32_ERROR(GetAdaptersAddresses(
+      0, // AF_UNSPEC
+      GAA_FLAG_SKIP_UNICAST | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+      None,
+      Some(adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH),
+      &mut buf_len as *mut core::ffi::c_ulong,
+    ));
+
+    if result == ERROR_SUCCESS {
+      let mut adapter_addresses_ptr = adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
+
+      while !adapter_addresses_ptr.is_null() {
+        let adapter = adapter_addresses_ptr.read_unaligned();
+
+        if adapter.IfType == 6 && adapter.FriendlyName.to_string().unwrap() == "Ethernet" && adapter.OperStatus == IfOperStatusUp {
+          is_plugged_in = true;
+        }
+        adapter_addresses_ptr = adapter.Next;
+      }
+
+      return is_plugged_in;
+    } else {
+      println!("Unable to get adapter addresses! {}", result.0);
+      return false;
+    }
+  }
 }

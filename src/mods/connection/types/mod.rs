@@ -1,2 +1,2 @@
 pub(crate) mod error;
-pub(crate) mod network;
+pub(crate) mod wlan;

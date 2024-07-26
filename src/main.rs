@@ -1,8 +1,11 @@
 mod mods;
 
-use mods::media::{
-  change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
-  types::{device::DeviceType, error::AudioDeviceError},
+use mods::{
+  connection::{is_ethernet_plugged_in, set_wifi_state},
+  media::{
+    change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
+    types::{device::DeviceType, error::AudioDeviceError},
+  },
 };
 use std::time::Duration;
 
@@ -72,6 +75,8 @@ fn connection_thread() -> Result<(), AudioDeviceError> {
   println!("  + Running Connection Thread");
 
   loop {
+    let _ = set_wifi_state(!is_ethernet_plugged_in());
+
     // println!("LOG FROM CONNECTION THREAD");
     std::thread::sleep(Duration::from_secs(1));
   }

@@ -1,17 +1,20 @@
-pub(crate) mod types;
+pub mod types;
 
 use types::{error::WlanHandlerError, wlan::WLAN};
-use windows::Win32::{
-  Foundation::{ERROR_SUCCESS, HANDLE, WIN32_ERROR},
-  NetworkManagement::{
-    IpHelper::{
-      GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST,
-      IP_ADAPTER_ADDRESSES_LH,
-    },
-    Ndis::IfOperStatusUp,
-    WiFi::{
-      WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetNetworkBssList, WlanOpenHandle,
-      WLAN_AVAILABLE_NETWORK, WLAN_BSS_ENTRY, WLAN_INTERFACE_INFO,
+use windows::{
+  Devices::Radios::{self, RadioKind},
+  Win32::{
+    Foundation::{ERROR_SUCCESS, HANDLE, WIN32_ERROR},
+    NetworkManagement::{
+      IpHelper::{
+        GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST,
+        IP_ADAPTER_ADDRESSES_LH,
+      },
+      Ndis::IfOperStatusUp,
+      WiFi::{
+        WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetNetworkBssList, WlanOpenHandle,
+        WLAN_AVAILABLE_NETWORK, WLAN_BSS_ENTRY, WLAN_INTERFACE_INFO,
+      },
     },
   },
 };
@@ -159,4 +162,20 @@ pub fn is_ethernet_plugged_in() -> bool {
       return false;
     }
   }
+}
+
+#[allow(dead_code)]
+pub fn set_wifi_state(on: bool) -> Result<(), anyhow::Error> {
+  let a = Radios::Radio::GetRadiosAsync()?.get()?;
+  for radio in 0..a.Size()? {
+    let radio = a.GetAt(radio)?;
+
+    if radio.Kind()? == RadioKind::WiFi {
+      match on {
+        true => radio.SetStateAsync(Radios::RadioState::On)?,
+        false => radio.SetStateAsync(Radios::RadioState::Off)?,
+      };
+    }
+  }
+  Ok(())
 }

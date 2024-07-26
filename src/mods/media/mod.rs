@@ -1,5 +1,5 @@
 mod policy_config;
-pub(crate) mod types;
+pub mod types;
 
 use std::{path::Path, str::FromStr};
 use types::{

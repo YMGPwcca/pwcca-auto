@@ -1,4 +1,4 @@
-pub(crate) mod connection;
-pub(crate) mod display;
-pub(crate) mod media;
-pub(crate) mod power;
+pub mod connection;
+pub mod display;
+pub mod media;
+pub mod power;

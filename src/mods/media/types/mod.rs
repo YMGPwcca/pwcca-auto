@@ -1,2 +1,2 @@
-pub(crate) mod device;
-pub(crate) mod error;
+pub mod device;
+pub mod error;

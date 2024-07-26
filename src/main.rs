@@ -1,24 +1,122 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod mods;
 
 use mods::{
   connection::{is_ethernet_plugged_in, set_wifi_state},
+  display::{get_all_frequencies, get_current_frequency, set_new_frequency, turn_off_monitor},
   media::{
     change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
     types::{device::DeviceType, error::AudioDeviceError},
   },
 };
-use std::time::Duration;
+use std::{mem::MaybeUninit, time::Duration};
+use sysinfo::System;
+use trayicon::{MenuBuilder, TrayIconBuilder};
+use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageA, GetMessageA, TranslateMessage};
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum Events {
+  RightClickTrayIcon,
+  Discord,
+  Ethernet,
+  TurnOffMonitor,
+  RefreshRate,
+  Exit,
+}
+
+static mut DISCORD: bool = true;
+static mut ETHERNET: bool = true;
+
+fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) {
+  tray_icon
+    .set_menu(
+      &MenuBuilder::new()
+        .checkable("Discord", unsafe { DISCORD }, Events::Discord)
+        .checkable("Ethernet", unsafe { ETHERNET }, Events::Ethernet)
+        .separator()
+        .item("Turn off monitor", Events::TurnOffMonitor)
+        .item(
+          format!("Refresh Rate: {} Hz", get_current_frequency()).as_str(),
+          Events::RefreshRate,
+        )
+        .separator()
+        .item("Exit", Events::Exit),
+    )
+    .unwrap();
+}
 
 fn main() {
-  println!("Running PCM-Backend-Test");
+  let s = System::new_all();
+  let new_all = s.processes_by_name("PwccaAuto");
+  for i in new_all {
+    if std::process::id() != i.pid().as_u32() {
+      std::process::exit(0);
+    }
+  }
 
-  let media = std::thread::spawn(move || media_thread());
-  let connection = std::thread::spawn(move || connection_thread());
-  let power = std::thread::spawn(move || power_thread());
+  println!("Running Pwcca Auto");
 
-  let _ = media.join();
-  let _ = connection.join();
-  let _ = power.join();
+  let (s, r) = std::sync::mpsc::channel::<Events>();
+  let icon = include_bytes!("../res/icon.ico");
+
+  let mut tray_icon = TrayIconBuilder::new()
+    .sender(move |e: &Events| {
+      let _ = s.send(*e);
+    })
+    .icon_from_buffer(icon)
+    .tooltip("Pwcca Auto")
+    .on_right_click(Events::RightClickTrayIcon)
+    .build()
+    .unwrap();
+
+  setup_tray_icon_menu(&mut tray_icon);
+
+  std::thread::spawn(move || {
+    r.iter().for_each(|m| match m {
+      Events::RightClickTrayIcon => {
+        tray_icon.show_menu().unwrap();
+      }
+      Events::Discord => unsafe {
+        DISCORD = !DISCORD;
+        setup_tray_icon_menu(&mut tray_icon);
+      },
+      Events::Ethernet => unsafe {
+        ETHERNET = !ETHERNET;
+
+        setup_tray_icon_menu(&mut tray_icon);
+      },
+      Events::TurnOffMonitor => turn_off_monitor(),
+      Events::RefreshRate => {
+        let refresh_rate = get_current_frequency();
+        let max_refresh_rate = get_all_frequencies().last().copied().unwrap();
+        set_new_frequency(if refresh_rate == 60 { max_refresh_rate } else { 60 });
+
+        setup_tray_icon_menu(&mut tray_icon);
+      }
+      Events::Exit => std::process::exit(0),
+    })
+  });
+
+  let _ = std::thread::Builder::new()
+    .name("Media_Thread".to_string())
+    .spawn(move || media_thread());
+  let _ = std::thread::Builder::new()
+    .name("Connection_Thread".to_string())
+    .spawn(move || connection_thread());
+
+  loop {
+    unsafe {
+      let mut msg = MaybeUninit::uninit();
+      let bret = GetMessageA(msg.as_mut_ptr(), None, 0, 0);
+      if bret.0 > 0 {
+        let _ = TranslateMessage(msg.as_ptr());
+        DispatchMessageA(msg.as_ptr());
+      } else {
+        break;
+      }
+    }
+  }
 }
 
 #[allow(dead_code)]
@@ -32,6 +130,10 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   let discord_executable = String::from("Discord.exe");
 
   loop {
+    if !unsafe { DISCORD } {
+      continue;
+    }
+
     // Get all output devices
     let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
 
@@ -75,20 +177,12 @@ fn connection_thread() -> Result<(), AudioDeviceError> {
   println!("  + Running Connection Thread");
 
   loop {
+    if !unsafe { ETHERNET } {
+      continue;
+    }
+
     let _ = set_wifi_state(!is_ethernet_plugged_in());
 
-    // println!("LOG FROM CONNECTION THREAD");
-    std::thread::sleep(Duration::from_secs(1));
-  }
-}
-
-#[allow(dead_code)]
-fn power_thread() -> Result<(), AudioDeviceError> {
-  // Initialize the power thread
-  println!("  + Running Power Thread");
-
-  loop {
-    // println!("LOG FROM POWER THREAD");
     std::thread::sleep(Duration::from_secs(1));
   }
 }

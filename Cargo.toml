@@ -4,33 +4,28 @@ version = "0.1.0"
 edition = "2021"
 build = "build.rs"
 
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.58.0", features = [
-  "Devices_Radios",
-  "Foundation_Collections",
-  "Win32_Devices_FunctionDiscovery",
-  "Win32_Graphics_Gdi",
-  "Win32_Media_Audio",
-  "Win32_NetworkManagement_WiFi",
-  "Win32_NetworkManagement_IpHelper",
-  "Win32_NetworkManagement_Ndis",
-  "Win32_Networking_WinSock",
-  "Win32_UI_WindowsAndMessaging",
-  "Win32_System_Com",
-  "Win32_System_Power",
-  "Win32_System_ProcessStatus",
-  "Win32_System_Threading",
-  "Win32_UI_Shell_PropertiesSystem",
-] }
-
-[target.'cfg(windows)'.build-dependencies]
-winres = "0.1.12"
-
-[dependencies]
-anyhow = "1.0.86"
-sysinfo = { version = "0.30.13", default-features = false }
-trayicon = { version = "0.2.0", default-features = false }
-
 [[bin]]
 name = "PwccaAuto"
 path = "src/main.rs"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58.0", features = [
+  'Devices_Radios',
+  'Foundation_Collections',
+  'Win32_Devices_FunctionDiscovery',
+  'Win32_Graphics_Gdi',
+  'Win32_Media_Audio',
+  'Win32_NetworkManagement_IpHelper',
+  'Win32_NetworkManagement_Ndis',
+  'Win32_Networking_WinSock',
+  'Win32_System_Com',
+  'Win32_System_ProcessStatus',
+  'Win32_System_Threading',
+  'Win32_UI_Shell_PropertiesSystem',
+  'Win32_UI_WindowsAndMessaging'
+] }
+sysinfo = { version = "0.30.13", default-features = false }
+trayicon = { version = "0.2.0", default-features = false }
+
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1.12"

@@ -1,0 +1,4 @@
+- This branch will implement the core functionalities of the project.
+- This branch will be trimmed down to have the least code possible.
+- The main branch will be the testing ground and implement more things.
+- 

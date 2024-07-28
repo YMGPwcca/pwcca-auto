@@ -1,6 +1,6 @@
 pub mod types;
 
-use types::{error::WlanHandlerError, wlan::WLAN};
+use types::{error::WlanHandlerError, wlan::Wlan};
 use windows::{
   Devices::Radios::{self, RadioKind},
   Win32::{
@@ -106,8 +106,8 @@ fn get_network_bss_list(
 }
 
 #[allow(dead_code)]
-pub fn get_available_networks() -> Result<Vec<WLAN>, WlanHandlerError> {
-  let mut network_list: Vec<WLAN> = Vec::new();
+pub fn get_available_networks() -> Result<Vec<Wlan>, WlanHandlerError> {
+  let mut network_list: Vec<Wlan> = Vec::new();
 
   let handle = open_handle()?;
 
@@ -118,7 +118,7 @@ pub fn get_available_networks() -> Result<Vec<WLAN>, WlanHandlerError> {
     }
 
     for network in get_available_network_list.unwrap() {
-      network_list.push(WLAN::new(&network, get_network_bss_list(&handle, &interface, &network)?));
+      network_list.push(Wlan::new(&network, get_network_bss_list(&handle, &interface, &network)?));
     }
   }
 
@@ -156,19 +156,18 @@ pub fn is_ethernet_plugged_in() -> bool {
         adapter_addresses_ptr = adapter.Next;
       }
 
-      return is_plugged_in;
+      is_plugged_in
     } else {
-      println!("Unable to get adapter addresses! {}", result.0);
-      return false;
+      false
     }
   }
 }
 
 #[allow(dead_code)]
-pub fn set_wifi_state(on: bool) -> Result<(), anyhow::Error> {
-  let a = Radios::Radio::GetRadiosAsync()?.get()?;
-  for radio in 0..a.Size()? {
-    let radio = a.GetAt(radio)?;
+pub fn set_wifi_state(on: bool) -> std::io::Result<()> {
+  let radios = Radios::Radio::GetRadiosAsync()?.get()?;
+  for radio in 0..radios.Size()? {
+    let radio = radios.GetAt(radio)?;
 
     if radio.Kind()? == RadioKind::WiFi {
       match on {

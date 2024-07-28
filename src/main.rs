@@ -69,38 +69,13 @@ fn main() {
 
   setup_tray_icon_menu(&mut tray_icon);
 
-  let _ = std::thread::Builder::new().name("Tray_Thread".to_string()).spawn(move || {
-    receiver.iter().for_each(|m| match m {
-      Events::RightClickTrayIcon => {
-        tray_icon.show_menu().unwrap();
-      }
-      Events::Discord => unsafe {
-        DISCORD = !DISCORD;
-        setup_tray_icon_menu(&mut tray_icon);
-      },
-      Events::Ethernet => unsafe {
-        ETHERNET = !ETHERNET;
-
-        setup_tray_icon_menu(&mut tray_icon);
-      },
-      Events::TurnOffMonitor => turn_off_monitor(),
-      Events::RefreshRate => {
-        let refresh_rate = get_current_frequency();
-        let max_refresh_rate = get_all_frequencies().last().copied().unwrap();
-        set_new_frequency(if refresh_rate == 60 { max_refresh_rate } else { 60 });
-
-        setup_tray_icon_menu(&mut tray_icon);
-      }
-      Events::Exit => std::process::exit(0),
-    })
-  });
-
-  let _ = std::thread::Builder::new()
-    .name("Media_Thread".to_string())
-    .spawn(move || media_thread());
+  let _ = std::thread::Builder::new().name("Media_Thread".to_string()).spawn(media_thread);
   let _ = std::thread::Builder::new()
     .name("Connection_Thread".to_string())
-    .spawn(move || connection_thread());
+    .spawn(connection_thread);
+  let _ = std::thread::Builder::new()
+    .name("Tray_Thread".to_string())
+    .spawn(|| tray_thread(receiver, tray_icon));
 
   // Application loop
   loop {
@@ -118,6 +93,35 @@ fn main() {
 }
 
 #[allow(dead_code)]
+fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: trayicon::TrayIcon<Events>) {
+  // Initialize the tray thread
+  println!("  + Running Tray Thread");
+
+  receiver.iter().for_each(|m| match m {
+    Events::RightClickTrayIcon => {
+      tray_icon.show_menu().unwrap();
+    }
+    Events::Discord => unsafe {
+      DISCORD = !DISCORD;
+      setup_tray_icon_menu(&mut tray_icon);
+    },
+    Events::Ethernet => unsafe {
+      ETHERNET = !ETHERNET;
+      setup_tray_icon_menu(&mut tray_icon);
+    },
+    Events::TurnOffMonitor => turn_off_monitor(),
+    Events::RefreshRate => {
+      let refresh_rate = get_current_frequency();
+      let max_refresh_rate = get_all_frequencies().last().copied().unwrap();
+      set_new_frequency(if refresh_rate == 60 { max_refresh_rate } else { 60 });
+
+      setup_tray_icon_menu(&mut tray_icon);
+    }
+    Events::Exit => std::process::exit(0),
+  });
+}
+
+#[allow(dead_code)]
 fn media_thread() -> Result<(), AudioDeviceError> {
   // Initialize the media thread
   println!("  + Running Media Thread");
@@ -128,43 +132,40 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   let discord_executable = String::from("Discord.exe");
 
   loop {
-    if !unsafe { DISCORD } {
-      continue;
-    }
+    if unsafe { DISCORD } {
+      // Get all output devices
+      let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
 
-    // Get all output devices
-    let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
+      // Check if there are multiple output devices
+      if all_outputs.len() > 1 {
+        // Get the current default output device
+        let current_output = get_default_device(&DeviceType::Output)?;
 
-    // Check if there are multiple output devices
-    if all_outputs.len() > 1 {
-      // Get the current default output device
-      let current_output = get_default_device(&DeviceType::Output)?;
+        // Check if Discord is running and recording from default input device
+        let programs = get_active_audio_applications(&DeviceType::Input)?;
 
-      // Check if Discord is running and recording from default input device
-      let programs = get_active_audio_applications(&DeviceType::Input)?;
+        if programs.contains(&discord_executable) {
+          connected = true;
 
-      if programs.contains(&discord_executable) {
-        connected = true;
+          // Switch to headphones if Discord is recording and speakers are the default
+          if current_output.device_type == "Speakers" {
+            let headphones = all_outputs.iter().find(|device| device.device_type == "Headphones").unwrap();
 
-        // Switch to headphones if Discord is recording and speakers are the default
-        if current_output.device_type == "Speakers" {
-          let headphones = all_outputs.iter().find(|device| device.device_type == "Headphones").unwrap();
+            change_default_output(headphones.device_id)?
+          }
+        } else if connected {
+          connected = false;
 
-          change_default_output(headphones.device_id)?
-        }
-      } else if connected {
-        connected = false;
+          // Switch back to speakers if Discord is not recording and headphones are the default
+          if current_output.device_type == "Headphones" {
+            let headphones = all_outputs.iter().find(|device| device.device_type == "Speakers").unwrap();
 
-        // Switch back to speakers if Discord is not recording and headphones are the default
-        if current_output.device_type == "Headphones" {
-          let headphones = all_outputs.iter().find(|device| device.device_type == "Speakers").unwrap();
-
-          change_default_output(headphones.device_id)?
+            change_default_output(headphones.device_id)?
+          }
         }
       }
     }
 
-    // println!("LOG FROM MEDIA THREAD");
     std::thread::sleep(Duration::from_secs(1));
   }
 }
@@ -175,11 +176,9 @@ fn connection_thread() -> Result<(), AudioDeviceError> {
   println!("  + Running Connection Thread");
 
   loop {
-    if !unsafe { ETHERNET } {
-      continue;
+    if unsafe { ETHERNET } {
+      let _ = set_wifi_state(!is_ethernet_plugged_in());
     }
-
-    let _ = set_wifi_state(!is_ethernet_plugged_in());
 
     std::thread::sleep(Duration::from_secs(1));
   }

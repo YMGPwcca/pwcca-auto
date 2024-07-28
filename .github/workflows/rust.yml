@@ -19,5 +19,5 @@ jobs:
     - name: Archive production artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dist-without-markdown
+        name: PwccaAuto
         path: target/x86_64-pc-windows-msvc/release/PwccaAuto.exe

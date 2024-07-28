@@ -47,8 +47,8 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) {
 }
 
 fn main() {
-  let s = System::new_all();
-  let new_all = s.processes_by_name("PwccaAuto");
+  let system = System::new_all();
+  let new_all = system.processes_by_name("PwccaAuto");
   for i in new_all {
     if std::process::id() != i.pid().as_u32() {
       std::process::exit(0);
@@ -57,14 +57,11 @@ fn main() {
 
   println!("Running Pwcca Auto");
 
-  let (s, r) = std::sync::mpsc::channel::<Events>();
-  let icon = include_bytes!("../res/icon.ico");
+  let (sender, receiver) = std::sync::mpsc::channel::<Events>();
 
   let mut tray_icon = TrayIconBuilder::new()
-    .sender(move |e: &Events| {
-      let _ = s.send(*e);
-    })
-    .icon_from_buffer(icon)
+    .sender(move |e: &Events| sender.send(*e).unwrap())
+    .icon_from_buffer(include_bytes!("../res/icon.ico"))
     .tooltip("Pwcca Auto")
     .on_right_click(Events::RightClickTrayIcon)
     .build()
@@ -72,8 +69,8 @@ fn main() {
 
   setup_tray_icon_menu(&mut tray_icon);
 
-  std::thread::spawn(move || {
-    r.iter().for_each(|m| match m {
+  let _ = std::thread::Builder::new().name("Tray_Thread".to_string()).spawn(move || {
+    receiver.iter().for_each(|m| match m {
       Events::RightClickTrayIcon => {
         tray_icon.show_menu().unwrap();
       }
@@ -104,6 +101,7 @@ fn main() {
     .name("Connection_Thread".to_string())
     .spawn(|| connection_thread());
 
+  // Application loop
   loop {
     unsafe {
       let mut msg = MaybeUninit::uninit();

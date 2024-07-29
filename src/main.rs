@@ -6,7 +6,8 @@ use mods::{
   connection::{is_ethernet_plugged_in, set_wifi_state},
   display::{get_all_frequencies, get_current_frequency, set_new_frequency, turn_off_monitor},
   media::{
-    change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
+    change_default_output, enumerate_audio_devices, get_active_audio_applications,
+    get_default_device, init,
     types::{device::DeviceType, error::AudioDeviceError},
   },
   power::{get_all_power_schemes, get_power_status, set_active_power_scheme},
@@ -73,8 +74,12 @@ fn main() {
 
   setup_tray_icon_menu(&mut tray_icon);
 
-  let _ = std::thread::Builder::new().name("Power_Thread".to_string()).spawn(power_thread);
-  let _ = std::thread::Builder::new().name("Media_Thread".to_string()).spawn(media_thread);
+  let _ = std::thread::Builder::new()
+    .name("Power_Thread".to_string())
+    .spawn(power_thread);
+  let _ = std::thread::Builder::new()
+    .name("Media_Thread".to_string())
+    .spawn(media_thread);
   let _ = std::thread::Builder::new()
     .name("Connection_Thread".to_string())
     .spawn(connection_thread);
@@ -98,7 +103,10 @@ fn main() {
 }
 
 #[allow(dead_code)]
-fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: trayicon::TrayIcon<Events>) {
+fn tray_thread(
+  receiver: std::sync::mpsc::Receiver<Events>,
+  mut tray_icon: trayicon::TrayIcon<Events>,
+) {
   // Initialize the tray thread
   println!("  + Running Tray Thread");
 
@@ -118,7 +126,11 @@ fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: trayi
     Events::RefreshRate => {
       let refresh_rate = get_current_frequency();
       let max_refresh_rate = get_all_frequencies().last().copied().unwrap();
-      set_new_frequency(if refresh_rate == 60 { max_refresh_rate } else { 60 });
+      set_new_frequency(if refresh_rate == 60 {
+        max_refresh_rate
+      } else {
+        60
+      });
 
       setup_tray_icon_menu(&mut tray_icon);
     }
@@ -154,7 +166,10 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
           // Switch to headphones if Discord is recording and speakers are the default
           if current_output.device_type == "Speakers" {
-            let headphones = all_outputs.iter().find(|device| device.device_type == "Headphones").unwrap();
+            let headphones = all_outputs
+              .iter()
+              .find(|device| device.device_type == "Headphones")
+              .unwrap();
 
             change_default_output(headphones.device_id)?
           }
@@ -163,7 +178,10 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
           // Switch back to speakers if Discord is not recording and headphones are the default
           if current_output.device_type == "Headphones" {
-            let headphones = all_outputs.iter().find(|device| device.device_type == "Speakers").unwrap();
+            let headphones = all_outputs
+              .iter()
+              .find(|device| device.device_type == "Speakers")
+              .unwrap();
 
             change_default_output(headphones.device_id)?
           }
@@ -200,10 +218,16 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
     let all_power_schemes = get_all_power_schemes()?;
 
     if on_battery_secs > 300 {
-      let power_scheme = all_power_schemes.iter().find(|scheme| scheme.name == "POWERSAVER").unwrap();
+      let power_scheme = all_power_schemes
+        .iter()
+        .find(|scheme| scheme.name == "POWERSAVER")
+        .unwrap();
       let _ = set_active_power_scheme(&power_scheme.guid);
     } else {
-      let power_scheme = all_power_schemes.iter().find(|scheme| scheme.name == "Ultra").unwrap();
+      let power_scheme = all_power_schemes
+        .iter()
+        .find(|scheme| scheme.name == "Ultra")
+        .unwrap();
       let _ = set_active_power_scheme(&power_scheme.guid);
     }
 

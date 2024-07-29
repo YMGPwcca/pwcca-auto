@@ -41,19 +41,18 @@ pub fn is_ethernet_plugged_in() -> bool {
         adapter_addresses_ptr = adapter.Next;
       }
 
-      return is_plugged_in;
+      is_plugged_in
     } else {
-      println!("Unable to get adapter addresses! {}", result.0);
-      return false;
+      false
     }
   }
 }
 
 #[allow(dead_code)]
 pub fn set_wifi_state(on: bool) -> std::io::Result<()> {
-  let a = Radios::Radio::GetRadiosAsync()?.get()?;
-  for radio in 0..a.Size()? {
-    let radio = a.GetAt(radio)?;
+  let radios = Radios::Radio::GetRadiosAsync()?.get()?;
+  for radio in 0..radios.Size()? {
+    let radio = radios.GetAt(radio)?;
 
     if radio.Kind()? == RadioKind::WiFi {
       match on {

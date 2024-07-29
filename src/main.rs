@@ -69,15 +69,13 @@ fn main() {
 
   setup_tray_icon_menu(&mut tray_icon);
 
+  let _ = std::thread::Builder::new().name("Media_Thread".to_string()).spawn(media_thread);
+  let _ = std::thread::Builder::new()
+    .name("Connection_Thread".to_string())
+    .spawn(connection_thread);
   let _ = std::thread::Builder::new()
     .name("Tray_Thread".to_string())
     .spawn(|| tray_thread(receiver, tray_icon));
-  let _ = std::thread::Builder::new()
-    .name("Media_Thread".to_string())
-    .spawn(|| media_thread());
-  let _ = std::thread::Builder::new()
-    .name("Connection_Thread".to_string())
-    .spawn(|| connection_thread());
 
   // Application loop
   loop {

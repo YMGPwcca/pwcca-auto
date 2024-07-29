@@ -9,11 +9,15 @@ use mods::{
     change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
     types::{device::DeviceType, error::AudioDeviceError},
   },
+  power::{get_all_power_schemes, get_power_status, set_active_power_scheme},
 };
 use std::{mem::MaybeUninit, time::Duration};
 use sysinfo::System;
 use trayicon::{MenuBuilder, TrayIconBuilder};
-use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageA, GetMessageA, TranslateMessage};
+use windows::Win32::{
+  Foundation::WIN32_ERROR,
+  UI::WindowsAndMessaging::{DispatchMessageA, GetMessageA, TranslateMessage},
+};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Events {
@@ -69,6 +73,7 @@ fn main() {
 
   setup_tray_icon_menu(&mut tray_icon);
 
+  let _ = std::thread::Builder::new().name("Power_Thread".to_string()).spawn(power_thread);
   let _ = std::thread::Builder::new().name("Media_Thread".to_string()).spawn(media_thread);
   let _ = std::thread::Builder::new()
     .name("Connection_Thread".to_string())
@@ -178,6 +183,34 @@ fn connection_thread() -> Result<(), AudioDeviceError> {
   loop {
     if unsafe { ETHERNET } {
       let _ = set_wifi_state(!is_ethernet_plugged_in());
+    }
+
+    std::thread::sleep(Duration::from_secs(1));
+  }
+}
+
+#[allow(dead_code)]
+fn power_thread() -> Result<(), WIN32_ERROR> {
+  // Initialize the power thread
+  println!("  + Running Power Thread");
+
+  let mut on_battery_secs = 0;
+
+  loop {
+    let all_power_schemes = get_all_power_schemes()?;
+
+    if on_battery_secs > 300 {
+      let power_scheme = all_power_schemes.iter().find(|scheme| scheme.name == "POWERSAVER").unwrap();
+      let _ = set_active_power_scheme(&power_scheme.guid);
+    } else {
+      let power_scheme = all_power_schemes.iter().find(|scheme| scheme.name == "Ultra").unwrap();
+      let _ = set_active_power_scheme(&power_scheme.guid);
+    }
+
+    if !get_power_status().is_plugged_in {
+      on_battery_secs += 1;
+    } else {
+      on_battery_secs = 0;
     }
 
     std::thread::sleep(Duration::from_secs(1));

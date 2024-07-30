@@ -26,7 +26,7 @@ use windows::Win32::{
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Events {
-  RightClickTrayIcon,
+  LeftClickTrayIcon,
   Discord,
   Ethernet,
   TurnOffMonitor,
@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     .sender(move |e: &Events| sender.send(*e).unwrap())
     .icon_from_buffer(include_bytes!("../res/icon.ico"))
     .tooltip("Pwcca Auto")
-    .on_right_click(Events::RightClickTrayIcon)
+    .on_click(Events::LeftClickTrayIcon)
     .build()
     .unwrap();
 
@@ -125,7 +125,7 @@ fn tray_thread(
   println!("  + Running Tray Thread");
 
   receiver.iter().for_each(|m| match m {
-    Events::RightClickTrayIcon => {
+    Events::LeftClickTrayIcon => {
       tray_icon.show_menu().unwrap();
     }
     Events::Discord => {

@@ -6,8 +6,8 @@ use windows::{
   Win32::{
     Foundation::{ERROR_NO_MORE_ITEMS, ERROR_SUCCESS, WIN32_ERROR},
     System::Power::{
-      GetSystemPowerStatus, PowerEnumerate, PowerGetActiveScheme, PowerReadFriendlyName, PowerSetActiveScheme, ACCESS_SCHEME,
-      SYSTEM_POWER_STATUS,
+      GetSystemPowerStatus, PowerEnumerate, PowerGetActiveScheme, PowerReadFriendlyName,
+      PowerSetActiveScheme, ACCESS_SCHEME, SYSTEM_POWER_STATUS,
     },
   },
 };
@@ -23,7 +23,7 @@ pub fn get_power_status() -> SystemPowerStatus {
     SystemPowerStatus {
       is_plugged_in: system_power_status.ACLineStatus == 1,
       is_battery_saver_enabled: system_power_status.SystemStatusFlag == 1,
-      remaining_percentage: system_power_status.BatteryLifePercent,
+      remaining_percentage: system_power_status.BatteryLifePercent as u32,
       remaining_time: system_power_status.BatteryLifeTime,
     }
   }
@@ -101,12 +101,22 @@ fn get_power_scheme_friendly_name(scheme_guid: &GUID) -> Result<String, WIN32_ER
   let mut buffer: Vec<u8> = Vec::with_capacity(buffer_size as usize);
 
   unsafe {
-    let result = PowerReadFriendlyName(None, Some(scheme_guid), None, None, Some(buffer.as_mut_ptr()), &mut buffer_size);
+    let result = PowerReadFriendlyName(
+      None,
+      Some(scheme_guid),
+      None,
+      None,
+      Some(buffer.as_mut_ptr()),
+      &mut buffer_size,
+    );
     if result != ERROR_SUCCESS {
       return Err(result);
     }
 
-    let os_str = OsString::from_wide(std::slice::from_raw_parts(buffer.as_ptr() as *const u16, buffer_size as usize / 2));
+    let os_str = OsString::from_wide(std::slice::from_raw_parts(
+      buffer.as_ptr() as *const u16,
+      buffer_size as usize / 2,
+    ));
     match os_str.to_string_lossy().to_string() {
       string if !string.is_empty() => Ok(string.trim_end_matches('\0').to_string()),
       _ => Err(result),

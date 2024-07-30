@@ -2,4 +2,3 @@ tab_spaces = 2
 reorder_imports = true
 brace_style = "PreferSameLine"
 control_brace_style = "ClosingNextLine"
-max_width = 140

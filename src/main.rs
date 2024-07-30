@@ -1,16 +1,21 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod config;
 mod mods;
 
+use config::Config;
 use mods::{
   connection::{is_ethernet_plugged_in, set_wifi_state},
   display::{get_all_frequencies, get_current_frequency, set_new_frequency, turn_off_monitor},
   media::{
-    change_default_output, enumerate_audio_devices, get_active_audio_applications, get_default_device, init,
+    change_default_output, enumerate_audio_devices, get_active_audio_applications,
+    get_default_device, init,
     types::{device::DeviceType, error::AudioDeviceError},
   },
   power::{get_all_power_schemes, get_power_status, set_active_power_scheme},
 };
+
+use anyhow::Result;
 use std::{mem::MaybeUninit, time::Duration};
 use sysinfo::System;
 use trayicon::{MenuBuilder, TrayIconBuilder};
@@ -29,15 +34,14 @@ enum Events {
   Exit,
 }
 
-static mut DISCORD: bool = true;
-static mut ETHERNET: bool = true;
+static mut CONFIG: Config = Config::new();
 
-fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) {
+fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()> {
   tray_icon
     .set_menu(
       &MenuBuilder::new()
-        .checkable("Discord", unsafe { DISCORD }, Events::Discord)
-        .checkable("Ethernet", unsafe { ETHERNET }, Events::Ethernet)
+        .checkable("Discord", unsafe { CONFIG.discord }, Events::Discord)
+        .checkable("Ethernet", unsafe { CONFIG.ethernet }, Events::Ethernet)
         .separator()
         .item("Turn off monitor", Events::TurnOffMonitor)
         .item(
@@ -48,9 +52,15 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) {
         .item("Exit", Events::Exit),
     )
     .unwrap();
+
+  unsafe {
+    let _ = CONFIG.write();
+  };
+  Ok(())
 }
 
-fn main() {
+fn main() -> Result<()> {
+  // Check if another instance is running
   let system = System::new_all();
   let new_all = system.processes_by_name("PwccaAuto");
   for i in new_all {
@@ -58,6 +68,11 @@ fn main() {
       std::process::exit(0);
     }
   }
+
+  // Main application starts here
+  unsafe {
+    CONFIG = Config::read()?;
+  };
 
   println!("Running Pwcca Auto");
 
@@ -71,19 +86,23 @@ fn main() {
     .build()
     .unwrap();
 
-  setup_tray_icon_menu(&mut tray_icon);
+  setup_tray_icon_menu(&mut tray_icon)?;
 
-  let _ = std::thread::Builder::new().name("Power_Thread".to_string()).spawn(power_thread);
-  let _ = std::thread::Builder::new().name("Media_Thread".to_string()).spawn(media_thread);
+  let _ = std::thread::Builder::new()
+    .name("Power_Thread".to_string())
+    .spawn(power_thread);
+  let _ = std::thread::Builder::new()
+    .name("Media_Thread".to_string())
+    .spawn(media_thread);
   let _ = std::thread::Builder::new()
     .name("Connection_Thread".to_string())
     .spawn(connection_thread);
   let _ = std::thread::Builder::new()
     .name("Tray_Thread".to_string())
-    .spawn(|| tray_thread(receiver, tray_icon));
+    .spawn(move || tray_thread(receiver, tray_icon));
 
   // Application loop
-  loop {
+  Ok(loop {
     unsafe {
       let mut msg = MaybeUninit::uninit();
       let bret = GetMessageA(msg.as_mut_ptr(), None, 0, 0);
@@ -94,7 +113,43 @@ fn main() {
         break;
       }
     }
-  }
+  })
+}
+
+#[allow(dead_code)]
+fn tray_thread(
+  receiver: std::sync::mpsc::Receiver<Events>,
+  mut tray_icon: trayicon::TrayIcon<Events>,
+) {
+  // Initialize the tray thread
+  println!("  + Running Tray Thread");
+
+  receiver.iter().for_each(|m| match m {
+    Events::RightClickTrayIcon => {
+      tray_icon.show_menu().unwrap();
+    }
+    Events::Discord => {
+      unsafe { CONFIG.toggle_discord() };
+      let _ = setup_tray_icon_menu(&mut tray_icon);
+    }
+    Events::Ethernet => {
+      unsafe { CONFIG.toggle_ethernet() };
+      let _ = setup_tray_icon_menu(&mut tray_icon);
+    }
+    Events::TurnOffMonitor => turn_off_monitor(),
+    Events::RefreshRate => {
+      let refresh_rate = get_current_frequency();
+      let max_refresh_rate = get_all_frequencies().last().copied().unwrap();
+      set_new_frequency(if refresh_rate == 60 {
+        max_refresh_rate
+      } else {
+        60
+      });
+
+      let _ = setup_tray_icon_menu(&mut tray_icon);
+    }
+    Events::Exit => std::process::exit(0),
+  });
 }
 
 #[allow(dead_code)]
@@ -137,7 +192,7 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   let discord_executable = String::from("Discord.exe");
 
   loop {
-    if unsafe { DISCORD } {
+    if unsafe { CONFIG.discord } {
       // Get all output devices
       let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
 
@@ -154,7 +209,10 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
           // Switch to headphones if Discord is recording and speakers are the default
           if current_output.device_type == "Speakers" {
-            let headphones = all_outputs.iter().find(|device| device.device_type == "Headphones").unwrap();
+            let headphones = all_outputs
+              .iter()
+              .find(|device| device.device_type == "Headphones")
+              .unwrap();
 
             change_default_output(headphones.device_id)?
           }
@@ -163,7 +221,10 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
           // Switch back to speakers if Discord is not recording and headphones are the default
           if current_output.device_type == "Headphones" {
-            let headphones = all_outputs.iter().find(|device| device.device_type == "Speakers").unwrap();
+            let headphones = all_outputs
+              .iter()
+              .find(|device| device.device_type == "Speakers")
+              .unwrap();
 
             change_default_output(headphones.device_id)?
           }
@@ -181,7 +242,7 @@ fn connection_thread() -> Result<(), AudioDeviceError> {
   println!("  + Running Connection Thread");
 
   loop {
-    if unsafe { ETHERNET } {
+    if unsafe { CONFIG.ethernet } {
       let _ = set_wifi_state(!is_ethernet_plugged_in());
     }
 
@@ -199,11 +260,19 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
   loop {
     let all_power_schemes = get_all_power_schemes()?;
 
-    if on_battery_secs > 300 {
-      let power_scheme = all_power_schemes.iter().find(|scheme| scheme.name == "POWERSAVER").unwrap();
+    if on_battery_secs > unsafe { CONFIG.power.timer }
+      || get_power_status().remaining_percentage < unsafe { CONFIG.power.percentage }
+    {
+      let power_scheme = all_power_schemes
+        .iter()
+        .find(|scheme| scheme.name == "POWERSAVER")
+        .unwrap();
       let _ = set_active_power_scheme(&power_scheme.guid);
     } else {
-      let power_scheme = all_power_schemes.iter().find(|scheme| scheme.name == "Ultra").unwrap();
+      let power_scheme = all_power_schemes
+        .iter()
+        .find(|scheme| scheme.name == "Ultra")
+        .unwrap();
       let _ = set_active_power_scheme(&power_scheme.guid);
     }
 

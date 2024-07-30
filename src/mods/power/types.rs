@@ -5,7 +5,7 @@ use windows::core::GUID;
 pub struct SystemPowerStatus {
   pub is_plugged_in: bool,
   pub is_battery_saver_enabled: bool,
-  pub remaining_percentage: u8,
+  pub remaining_percentage: u32,
   pub remaining_time: u32,
 }
 

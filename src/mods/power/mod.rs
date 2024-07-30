@@ -23,7 +23,7 @@ pub fn get_power_status() -> SystemPowerStatus {
     SystemPowerStatus {
       is_plugged_in: system_power_status.ACLineStatus == 1,
       is_battery_saver_enabled: system_power_status.SystemStatusFlag == 1,
-      remaining_percentage: system_power_status.BatteryLifePercent,
+      remaining_percentage: system_power_status.BatteryLifePercent as u32,
       remaining_time: system_power_status.BatteryLifeTime,
     }
   }

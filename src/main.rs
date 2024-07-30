@@ -153,35 +153,6 @@ fn tray_thread(
 }
 
 #[allow(dead_code)]
-fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: trayicon::TrayIcon<Events>) {
-  // Initialize the tray thread
-  println!("  + Running Tray Thread");
-
-  receiver.iter().for_each(|m| match m {
-    Events::RightClickTrayIcon => {
-      tray_icon.show_menu().unwrap();
-    }
-    Events::Discord => unsafe {
-      DISCORD = !DISCORD;
-      setup_tray_icon_menu(&mut tray_icon);
-    },
-    Events::Ethernet => unsafe {
-      ETHERNET = !ETHERNET;
-      setup_tray_icon_menu(&mut tray_icon);
-    },
-    Events::TurnOffMonitor => turn_off_monitor(),
-    Events::RefreshRate => {
-      let refresh_rate = get_current_frequency();
-      let max_refresh_rate = get_all_frequencies().last().copied().unwrap();
-      set_new_frequency(if refresh_rate == 60 { max_refresh_rate } else { 60 });
-
-      setup_tray_icon_menu(&mut tray_icon);
-    }
-    Events::Exit => std::process::exit(0),
-  });
-}
-
-#[allow(dead_code)]
 fn media_thread() -> Result<(), AudioDeviceError> {
   // Initialize the media thread
   println!("  + Running Media Thread");

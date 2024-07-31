@@ -18,7 +18,7 @@ use windows::{
     },
     System::{
       Com::{CoCreateInstance, CoInitialize, CLSCTX_ALL, STGM_READ},
-      ProcessStatus::GetProcessImageFileNameA,
+      ProcessStatus::GetProcessImageFileNameW,
       Threading::{OpenProcess, PROCESS_ALL_ACCESS},
     },
   },
@@ -152,14 +152,14 @@ fn get_process_name(process_id: u32) -> Result<String, AudioDeviceError> {
 
   if !h_process.is_invalid() {
     let mut process_path_buffer = [0; MAX_PATH as usize];
-    let byte_written = unsafe { GetProcessImageFileNameA(h_process, &mut process_path_buffer) };
+    let byte_written = unsafe { GetProcessImageFileNameW(h_process, &mut process_path_buffer) };
 
     if byte_written == 0 {
       return Ok(String::new());
     };
 
     let process_path =
-      String::from_utf8(process_path_buffer[..byte_written as usize].to_vec()).unwrap_or_default();
+      String::from_utf16(&process_path_buffer[..byte_written as usize]).unwrap_or_default();
     let process_name = String::from_str(
       Path::new(&process_path)
         .file_name()

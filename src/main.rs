@@ -21,7 +21,7 @@ use sysinfo::System;
 use trayicon::{MenuBuilder, TrayIconBuilder};
 use windows::Win32::{
   Foundation::WIN32_ERROR,
-  UI::WindowsAndMessaging::{DispatchMessageA, GetMessageA, TranslateMessage},
+  UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage},
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -105,10 +105,10 @@ fn main() -> Result<()> {
   Ok(loop {
     unsafe {
       let mut msg = MaybeUninit::uninit();
-      let bret = GetMessageA(msg.as_mut_ptr(), None, 0, 0);
+      let bret = GetMessageW(msg.as_mut_ptr(), None, 0, 0);
       if bret.0 > 0 {
         let _ = TranslateMessage(msg.as_ptr());
-        DispatchMessageA(msg.as_ptr());
+        DispatchMessageW(msg.as_ptr());
       } else {
         break;
       }

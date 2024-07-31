@@ -4,8 +4,8 @@ use windows::{
     Foundation::{ERROR_SUCCESS, WIN32_ERROR},
     NetworkManagement::{
       IpHelper::{
-        GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST,
-        IP_ADAPTER_ADDRESSES_LH,
+        GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER,
+        GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST, IP_ADAPTER_ADDRESSES_LH,
       },
       Ndis::IfOperStatusUp,
     },
@@ -23,19 +23,26 @@ pub fn is_ethernet_plugged_in() -> bool {
 
     let result = WIN32_ERROR(GetAdaptersAddresses(
       0, // AF_UNSPEC
-      GAA_FLAG_SKIP_UNICAST | GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER,
+      GAA_FLAG_SKIP_UNICAST
+        | GAA_FLAG_SKIP_ANYCAST
+        | GAA_FLAG_SKIP_MULTICAST
+        | GAA_FLAG_SKIP_DNS_SERVER,
       None,
       Some(adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH),
       &mut buf_len as *mut core::ffi::c_ulong,
     ));
 
     if result == ERROR_SUCCESS {
-      let mut adapter_addresses_ptr = adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
+      let mut adapter_addresses_ptr =
+        adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
 
       while !adapter_addresses_ptr.is_null() {
         let adapter = adapter_addresses_ptr.read_unaligned();
 
-        if adapter.IfType == 6 && adapter.FriendlyName.to_string().unwrap() == "Ethernet" && adapter.OperStatus == IfOperStatusUp {
+        if adapter.IfType == 6
+          && adapter.FriendlyName.to_string().unwrap() == "Ethernet"
+          && adapter.OperStatus == IfOperStatusUp
+        {
           is_plugged_in = true;
         }
         adapter_addresses_ptr = adapter.Next;

@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 build = "build.rs"
 
+[[bin]]
+name = "PwccaAuto"
+path = "src/main.rs"
+
 [target.'cfg(windows)'.dependencies]
 anyhow = { version = "1.0.86" }
 serde = { version = "1.0.204", features = ["derive"] }
@@ -31,7 +35,3 @@ windows = { version = "0.58.0", features = [
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1.12"
-
-[[bin]]
-name = "PwccaAuto"
-path = "src/main.rs"

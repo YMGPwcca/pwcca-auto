@@ -48,7 +48,7 @@ impl Config {
   }
 
   pub fn write(&self) -> Result<Self> {
-    std::fs::write(Config::get_path()?, self.to_string()?)?;
+    std::fs::write(Config::get_path()?, self.stringify()?)?;
     Ok(*self)
   }
 
@@ -61,7 +61,7 @@ impl Config {
     }
   }
 
-  pub fn to_string(&self) -> Result<String> {
+  pub fn stringify(&self) -> Result<String> {
     Ok(serde_json::to_string_pretty(self)?)
   }
 }

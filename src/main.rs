@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod config;
@@ -13,6 +14,7 @@ use mods::{
     types::{device::DeviceType, error::AudioDeviceError},
   },
   power::{get_all_power_schemes, get_power_status, set_active_power_scheme},
+  taskbar::taskbar,
 };
 
 use anyhow::Result;
@@ -62,11 +64,8 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
 fn main() -> Result<()> {
   // Check if another instance is running
   let system = System::new_all();
-  let new_all = system.processes_by_name("PwccaAuto");
-  for i in new_all {
-    if std::process::id() != i.pid().as_u32() {
-      std::process::exit(0);
-    }
+  if system.processes_by_name("PwccaAuto").count() > 1 {
+    std::process::exit(0);
   }
 
   // Main application starts here
@@ -98,11 +97,14 @@ fn main() -> Result<()> {
     .name("Connection_Thread".to_string())
     .spawn(connection_thread);
   let _ = std::thread::Builder::new()
+    .name("Taskbar_Thread".to_string())
+    .spawn(taskbar_thread);
+  let _ = std::thread::Builder::new()
     .name("Tray_Thread".to_string())
     .spawn(move || tray_thread(receiver, tray_icon));
 
   // Application loop
-  Ok(loop {
+  loop {
     unsafe {
       let mut msg = MaybeUninit::uninit();
       let bret = GetMessageW(msg.as_mut_ptr(), None, 0, 0);
@@ -113,10 +115,10 @@ fn main() -> Result<()> {
         break;
       }
     }
-  })
+  }
+  Ok(())
 }
 
-#[allow(dead_code)]
 fn tray_thread(
   receiver: std::sync::mpsc::Receiver<Events>,
   mut tray_icon: trayicon::TrayIcon<Events>,
@@ -152,7 +154,6 @@ fn tray_thread(
   });
 }
 
-#[allow(dead_code)]
 fn media_thread() -> Result<(), AudioDeviceError> {
   // Initialize the media thread
   println!("  + Running Media Thread");
@@ -207,8 +208,7 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   }
 }
 
-#[allow(dead_code)]
-fn connection_thread() -> Result<(), AudioDeviceError> {
+fn connection_thread() {
   // Initialize the connection thread
   println!("  + Running Connection Thread");
 
@@ -221,7 +221,6 @@ fn connection_thread() -> Result<(), AudioDeviceError> {
   }
 }
 
-#[allow(dead_code)]
 fn power_thread() -> Result<(), WIN32_ERROR> {
   // Initialize the power thread
   println!("  + Running Power Thread");
@@ -254,5 +253,16 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
     }
 
     std::thread::sleep(Duration::from_secs(1));
+  }
+}
+
+fn taskbar_thread() {
+  // Initialize the taskbar thread
+  println!("  + Running Taskbar Thread");
+
+  loop {
+    taskbar();
+
+    std::thread::sleep(Duration::from_millis(300));
   }
 }

@@ -13,12 +13,12 @@ use windows::Win32::{
   },
 };
 
-static mut V: Vec<isize> = Vec::new();
+static mut PROGRAMS: Vec<isize> = Vec::new();
 
 extern "system" fn enum_window(handle: HWND, lparam: LPARAM) -> BOOL {
   unsafe {
     if IsWindowVisible(handle).as_bool() && IsZoomed(handle).as_bool() {
-      V.push(lparam.0);
+      PROGRAMS.push(lparam.0);
       CloseHandle(handle);
       return BOOL(0);
     }
@@ -28,10 +28,11 @@ extern "system" fn enum_window(handle: HWND, lparam: LPARAM) -> BOOL {
   }
 }
 
-pub fn taskbar() {
+pub fn taskbar_automation() {
   unsafe {
+    PROGRAMS.clear();
     let _ = EnumWindows(Some(enum_window), LPARAM::default());
-    hide_taskbar(V.is_empty());
+    hide_taskbar(PROGRAMS.is_empty());
   };
 }
 

@@ -14,7 +14,7 @@ use mods::{
     types::{device::DeviceType, error::AudioDeviceError},
   },
   power::{get_all_power_schemes, get_power_status, set_active_power_scheme},
-  taskbar::taskbar,
+  taskbar::taskbar_automation,
 };
 
 use anyhow::Result;
@@ -261,7 +261,7 @@ fn taskbar_thread() {
   println!("  + Running Taskbar Thread");
 
   loop {
-    taskbar();
+    taskbar_automation();
 
     std::thread::sleep(Duration::from_millis(300));
   }

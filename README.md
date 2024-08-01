@@ -1,0 +1,1 @@
+Memory leaks are inevitable. Use with caution! I am working on a fix for this.

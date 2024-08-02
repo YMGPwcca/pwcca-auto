@@ -1,39 +1,38 @@
-#![allow(unused)]
+#![allow(dead_code)]
 
 use windows::Win32::{
-  Foundation::{CloseHandle, BOOL, HWND, LPARAM},
+  Foundation::{BOOL, FALSE, HWND, LPARAM, TRUE},
   UI::{
     Shell::{
       SHAppBarMessage, ABM_GETSTATE, ABM_SETSTATE, ABS_ALWAYSONTOP, ABS_AUTOHIDE, APPBARDATA,
     },
-    WindowsAndMessaging::{
-      EnumWindows, GetAncestor, GetWindowTextLengthW, GetWindowTextW, IsWindowVisible, IsZoomed,
-      GA_ROOT,
-    },
+    WindowsAndMessaging::{EnumWindows, IsWindowVisible, IsZoomed},
   },
 };
 
-static mut PROGRAMS: Vec<isize> = Vec::new();
-
 extern "system" fn enum_window(handle: HWND, lparam: LPARAM) -> BOOL {
   unsafe {
-    if IsWindowVisible(handle).as_bool() && IsZoomed(handle).as_bool() {
-      PROGRAMS.push(lparam.0);
-      CloseHandle(handle);
-      return BOOL(0);
+    let programs = &mut *(lparam.0 as *mut Vec<isize>);
+    if IsWindowVisible(handle) == TRUE && IsZoomed(handle) == TRUE {
+      programs.push(lparam.0);
+      return FALSE;
     }
 
-    CloseHandle(handle);
-    BOOL(1)
+    TRUE
   }
 }
 
 pub fn taskbar_automation() {
+  let programs: Vec<isize> = Vec::new();
+
   unsafe {
-    PROGRAMS.clear();
-    let _ = EnumWindows(Some(enum_window), LPARAM::default());
-    hide_taskbar(PROGRAMS.is_empty());
+    let _ = EnumWindows(
+      Some(enum_window),
+      LPARAM(std::ptr::addr_of!(programs) as isize),
+    );
   };
+  hide_taskbar(programs.is_empty());
+  drop(programs);
 }
 
 fn hide_taskbar(hide: bool) {
@@ -41,7 +40,7 @@ fn hide_taskbar(hide: bool) {
     cbSize: std::mem::size_of::<APPBARDATA>() as u32,
     ..Default::default()
   };
-  let result = unsafe { SHAppBarMessage(ABM_GETSTATE, &mut pdata) };
+  unsafe { SHAppBarMessage(ABM_GETSTATE, &mut pdata) };
   pdata.lParam = LPARAM(if hide { ABS_AUTOHIDE } else { ABS_ALWAYSONTOP } as isize);
 
   let _ = unsafe { SHAppBarMessage(ABM_SETSTATE, &mut pdata) };

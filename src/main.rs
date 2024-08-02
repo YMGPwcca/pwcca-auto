@@ -22,17 +22,21 @@ use std::{mem::MaybeUninit, time::Duration};
 use sysinfo::System;
 use trayicon::{MenuBuilder, TrayIconBuilder};
 use windows::Win32::{
-  Foundation::WIN32_ERROR,
+  Foundation::{TRUE, WIN32_ERROR},
   UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage},
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Events {
   LeftClickTrayIcon,
+
   Discord,
   Ethernet,
+  Taskbar,
+
   TurnOffMonitor,
   RefreshRate,
+
   Exit,
 }
 
@@ -44,6 +48,7 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
       &MenuBuilder::new()
         .checkable("Discord", unsafe { CONFIG.discord }, Events::Discord)
         .checkable("Ethernet", unsafe { CONFIG.ethernet }, Events::Ethernet)
+        .checkable("Taskbar", unsafe { CONFIG.taskbar }, Events::Taskbar)
         .separator()
         .item("Turn off monitor", Events::TurnOffMonitor)
         .item(
@@ -108,7 +113,7 @@ fn main() -> Result<()> {
     unsafe {
       let mut msg = MaybeUninit::uninit();
       let bret = GetMessageW(msg.as_mut_ptr(), None, 0, 0);
-      if bret.0 > 0 {
+      if bret == TRUE {
         let _ = TranslateMessage(msg.as_ptr());
         DispatchMessageW(msg.as_ptr());
       } else {
@@ -136,6 +141,10 @@ fn tray_thread(
     }
     Events::Ethernet => {
       unsafe { CONFIG.toggle_ethernet() };
+      let _ = setup_tray_icon_menu(&mut tray_icon);
+    }
+    Events::Taskbar => {
+      unsafe { CONFIG.toggle_taskbar() };
       let _ = setup_tray_icon_menu(&mut tray_icon);
     }
     Events::TurnOffMonitor => turn_off_monitor(),
@@ -226,24 +235,24 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
   println!("  + Running Power Thread");
 
   let mut on_battery_secs = 0;
+  let all_power_schemes = get_all_power_schemes()?;
+
+  let powersaver = all_power_schemes
+    .iter()
+    .find(|scheme| scheme.name == "POWERSAVER")
+    .unwrap();
+  let ultra = all_power_schemes
+    .iter()
+    .find(|scheme| scheme.name == "Ultra")
+    .unwrap();
 
   loop {
-    let all_power_schemes = get_all_power_schemes()?;
-
     if on_battery_secs > unsafe { CONFIG.power.timer }
       || get_power_status().remaining_percentage < unsafe { CONFIG.power.percentage }
     {
-      let power_scheme = all_power_schemes
-        .iter()
-        .find(|scheme| scheme.name == "POWERSAVER")
-        .unwrap();
-      let _ = set_active_power_scheme(&power_scheme.guid);
+      set_active_power_scheme(&powersaver.guid)?;
     } else {
-      let power_scheme = all_power_schemes
-        .iter()
-        .find(|scheme| scheme.name == "Ultra")
-        .unwrap();
-      let _ = set_active_power_scheme(&power_scheme.guid);
+      set_active_power_scheme(&ultra.guid)?;
     }
 
     if !get_power_status().is_plugged_in {
@@ -261,8 +270,10 @@ fn taskbar_thread() {
   println!("  + Running Taskbar Thread");
 
   loop {
-    taskbar_automation();
+    if unsafe { CONFIG.taskbar } {
+      taskbar_automation();
+    }
 
-    std::thread::sleep(Duration::from_millis(300));
+    std::thread::sleep(Duration::from_secs(1));
   }
 }

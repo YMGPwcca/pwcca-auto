@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct Config {
   pub discord: bool,
   pub ethernet: bool,
+  pub taskbar: bool,
   pub power: Power,
 }
 
@@ -22,6 +23,7 @@ impl Config {
     Config {
       discord: false,
       ethernet: false,
+      taskbar: false,
       power: Power {
         timer: 300,
         percentage: 60,
@@ -41,6 +43,10 @@ impl Config {
 
   pub fn toggle_ethernet(&mut self) {
     self.ethernet = !self.ethernet;
+  }
+
+  pub fn toggle_taskbar(&mut self) {
+    self.taskbar = !self.taskbar;
   }
 
   pub fn set_power(&mut self, timer: u32, percentage: u32) {

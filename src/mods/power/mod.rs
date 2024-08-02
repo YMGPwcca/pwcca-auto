@@ -70,9 +70,9 @@ pub fn get_all_power_schemes() -> Result<Vec<PowerScheme>, WIN32_ERROR> {
 
 #[allow(dead_code)]
 pub fn get_active_power_scheme() -> Result<PowerScheme, WIN32_ERROR> {
-  unsafe {
-    let mut buffer = std::ptr::null_mut();
+  let mut buffer = std::ptr::null_mut();
 
+  unsafe {
     let result = PowerGetActiveScheme(None, &mut buffer);
     if result == ERROR_SUCCESS {
       Ok(PowerScheme {

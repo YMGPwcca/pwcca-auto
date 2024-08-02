@@ -6,7 +6,7 @@ mod mods;
 
 use config::Config;
 use mods::{
-  connection::{is_ethernet_plugged_in, set_wifi_state},
+  connection::{get_wifi_state, is_ethernet_plugged_in, set_wifi_state},
   display::{get_all_frequencies, get_current_frequency, set_new_frequency, turn_off_monitor},
   media::{
     change_default_output, enumerate_audio_devices, get_active_audio_applications,
@@ -217,13 +217,21 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   }
 }
 
-fn connection_thread() {
+fn connection_thread() -> Result<(), anyhow::Error> {
   // Initialize the connection thread
   println!("  + Running Connection Thread");
 
   loop {
     if unsafe { CONFIG.ethernet } {
-      let _ = set_wifi_state(!is_ethernet_plugged_in());
+      let ethernet = is_ethernet_plugged_in();
+      let get_wifi_state = get_wifi_state()?;
+
+      if get_wifi_state && ethernet {
+        let _ = set_wifi_state(false);
+      }
+      if !get_wifi_state && !ethernet {
+        let _ = set_wifi_state(true);
+      }
     }
 
     std::thread::sleep(Duration::from_secs(1));

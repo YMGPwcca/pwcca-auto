@@ -1,8 +1,9 @@
+#![allow(dead_code)]
 pub mod types;
 
 use types::{error::WlanHandlerError, wlan::Wlan};
 use windows::{
-  Devices::Radios::{self, RadioKind},
+  Devices::Radios::{self, Radio, RadioKind, RadioState},
   Win32::{
     Foundation::{ERROR_SUCCESS, HANDLE, WIN32_ERROR},
     NetworkManagement::{
@@ -122,24 +123,25 @@ fn get_network_bss_list(
   }
 }
 
-#[allow(dead_code)]
 pub fn get_available_networks() -> Result<Vec<Wlan>, WlanHandlerError> {
   let mut network_list: Vec<Wlan> = Vec::new();
 
   let handle = open_handle()?;
 
   for interface in enum_interfaces(&handle)? {
-    let get_available_network_list = get_available_network_list(&handle, &interface);
-    if get_available_network_list.is_err() {
+    let available_network_list = get_available_network_list(&handle, &interface);
+    if available_network_list.is_err() {
       continue;
     }
 
-    for network in get_available_network_list.unwrap() {
+    let available_network_list = get_available_network_list(&handle, &interface).unwrap();
+    for network in &available_network_list {
       network_list.push(Wlan::new(
         &network,
         get_network_bss_list(&handle, &interface, &network)?,
       ));
     }
+    drop(available_network_list);
   }
 
   unsafe { WlanCloseHandle(handle, None) };
@@ -147,16 +149,14 @@ pub fn get_available_networks() -> Result<Vec<Wlan>, WlanHandlerError> {
   Ok(network_list)
 }
 
-#[allow(dead_code)]
 pub fn is_ethernet_plugged_in() -> bool {
   let mut is_plugged_in = false;
 
-  unsafe {
-    // https://docs.microsoft.com/en-us/windows/desktop/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
-    let mut buf_len: core::ffi::c_ulong = 16384;
-    let mut adapters_addresses_buffer = Vec::with_capacity(buf_len as usize);
-
-    let result = WIN32_ERROR(GetAdaptersAddresses(
+  // https://docs.microsoft.com/en-us/windows/desktop/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
+  let mut buf_len: core::ffi::c_ulong = 16384;
+  let mut adapters_addresses_buffer = vec![0; buf_len as usize];
+  let result = WIN32_ERROR(unsafe {
+    GetAdaptersAddresses(
       0, // AF_UNSPEC
       GAA_FLAG_SKIP_UNICAST
         | GAA_FLAG_SKIP_ANYCAST
@@ -164,44 +164,53 @@ pub fn is_ethernet_plugged_in() -> bool {
         | GAA_FLAG_SKIP_DNS_SERVER,
       None,
       Some(adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH),
-      &mut buf_len as *mut core::ffi::c_ulong,
-    ));
+      &mut buf_len,
+    )
+  });
 
-    if result == ERROR_SUCCESS {
-      let mut adapter_addresses_ptr =
-        adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
+  if result == ERROR_SUCCESS {
+    let mut adapter_addresses_ptr =
+      adapters_addresses_buffer.as_mut_ptr() as *mut IP_ADAPTER_ADDRESSES_LH;
 
-      while !adapter_addresses_ptr.is_null() {
-        let adapter = adapter_addresses_ptr.read_unaligned();
+    while !adapter_addresses_ptr.is_null() {
+      let adapter = unsafe { adapter_addresses_ptr.read_unaligned() };
 
-        if adapter.IfType == 6
-          && adapter.FriendlyName.to_string().unwrap() == "Ethernet"
-          && adapter.OperStatus == IfOperStatusUp
-        {
-          is_plugged_in = true;
-        }
-        adapter_addresses_ptr = adapter.Next;
+      if adapter.IfType == 6 && unsafe { adapter.FriendlyName.to_string().unwrap() } == "Ethernet" {
+        is_plugged_in = adapter.OperStatus == IfOperStatusUp;
+        break;
       }
-
-      is_plugged_in
-    } else {
-      false
+      adapter_addresses_ptr = adapter.Next;
     }
+
+    drop(adapters_addresses_buffer);
+
+    is_plugged_in
+  } else {
+    false
   }
 }
 
-#[allow(dead_code)]
-pub fn set_wifi_state(on: bool) -> std::io::Result<()> {
-  let radios = Radios::Radio::GetRadiosAsync()?.get()?;
-  for radio in 0..radios.Size()? {
-    let radio = radios.GetAt(radio)?;
+fn get_wifi_radio() -> Result<Radio, anyhow::Error> {
+  Ok(
+    Radios::Radio::GetRadiosAsync()?
+      .get()?
+      .into_iter()
+      .find(|e| e.Kind() == Ok(RadioKind::WiFi))
+      .expect("No WiFi radio found"),
+  )
+}
 
-    if radio.Kind()? == RadioKind::WiFi {
-      match on {
-        true => radio.SetStateAsync(Radios::RadioState::On)?,
-        false => radio.SetStateAsync(Radios::RadioState::Off)?,
-      };
-    }
-  }
+pub fn get_wifi_state() -> Result<bool, anyhow::Error> {
+  let radio = get_wifi_radio()?;
+  Ok(match radio.State()? {
+    RadioState::On => true,
+    _ => false,
+  })
+}
+
+pub fn set_wifi_state(on: bool) -> Result<(), anyhow::Error> {
+  let radio = get_wifi_radio()?;
+  radio.SetStateAsync(if on { RadioState::On } else { RadioState::Off })?;
+  drop(radio);
   Ok(())
 }

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod policy_config;
 pub mod types;
 
@@ -26,7 +28,6 @@ use windows::{
 
 static mut IS_INITIALIZED: bool = false;
 
-#[allow(dead_code)]
 pub fn init() -> Result<(), AudioDeviceError> {
   unsafe {
     if IS_INITIALIZED {
@@ -45,7 +46,6 @@ pub fn init() -> Result<(), AudioDeviceError> {
   }
 }
 
-#[allow(dead_code)]
 fn init_check() -> Result<(), AudioDeviceError> {
   if !unsafe { IS_INITIALIZED } {
     return Err(AudioDeviceError::new_with_message(
@@ -56,7 +56,6 @@ fn init_check() -> Result<(), AudioDeviceError> {
   Ok(())
 }
 
-#[allow(dead_code)]
 fn get_device_info(device: &IMMDevice) -> Result<Device, AudioDeviceError> {
   unsafe {
     let property_store = device
@@ -83,7 +82,6 @@ fn get_device_info(device: &IMMDevice) -> Result<Device, AudioDeviceError> {
   }
 }
 
-#[allow(dead_code)]
 pub fn get_default_device(device_type: &DeviceType) -> Result<Device, AudioDeviceError> {
   init_check()?;
 
@@ -104,7 +102,6 @@ pub fn get_default_device(device_type: &DeviceType) -> Result<Device, AudioDevic
   }
 }
 
-#[allow(dead_code)]
 pub fn enumerate_audio_devices(device_type: &DeviceType) -> Result<Vec<Device>, AudioDeviceError> {
   init_check()?;
 
@@ -133,11 +130,10 @@ pub fn enumerate_audio_devices(device_type: &DeviceType) -> Result<Vec<Device>, 
   }
 }
 
-#[allow(dead_code)]
 pub fn change_default_output(device_id: PWSTR) -> Result<(), AudioDeviceError> {
-  unsafe {
-    init_check()?;
+  init_check()?;
 
+  unsafe {
     let policy = policy_config::IPolicyConfig::new()
       .map_err(|e| AudioDeviceError::new(ErrorEnum::InitializationFailed, e.into()))?;
     policy
@@ -146,7 +142,6 @@ pub fn change_default_output(device_id: PWSTR) -> Result<(), AudioDeviceError> {
   }
 }
 
-#[allow(dead_code)]
 fn get_process_name(process_id: u32) -> Result<String, AudioDeviceError> {
   let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, false, process_id) }.unwrap_or_default();
 
@@ -154,6 +149,7 @@ fn get_process_name(process_id: u32) -> Result<String, AudioDeviceError> {
     let mut process_path_buffer = [0; MAX_PATH as usize];
     let byte_written = unsafe { GetProcessImageFileNameW(h_process, &mut process_path_buffer) };
 
+    unsafe { CloseHandle(h_process).unwrap() };
     if byte_written == 0 {
       return Ok(String::new());
     };
@@ -172,12 +168,9 @@ fn get_process_name(process_id: u32) -> Result<String, AudioDeviceError> {
     return Ok(process_name);
   }
 
-  unsafe { CloseHandle(h_process).unwrap() };
-
   Ok(String::new())
 }
 
-#[allow(dead_code)]
 pub fn get_active_audio_applications(
   device_type: &DeviceType,
 ) -> Result<Vec<String>, AudioDeviceError> {

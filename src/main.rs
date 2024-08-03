@@ -6,7 +6,7 @@ mod mods;
 
 use config::Config;
 use mods::{
-  connection::{get_wifi_state, is_ethernet_plugged_in, set_wifi_state},
+  connection::{is_ethernet_plugged_in, set_wifi_state},
   display::{get_all_frequencies, get_current_frequency, set_new_frequency, turn_off_monitor},
   media::{
     change_default_output, enumerate_audio_devices, get_active_audio_applications,
@@ -82,6 +82,7 @@ fn main() -> Result<()> {
 
   let (sender, receiver) = std::sync::mpsc::channel::<Events>();
 
+  // Tray icon
   let mut tray_icon = TrayIconBuilder::new()
     .sender(move |e: &Events| sender.send(*e).unwrap())
     .icon_from_buffer(include_bytes!("../res/icon.ico"))
@@ -92,6 +93,7 @@ fn main() -> Result<()> {
 
   setup_tray_icon_menu(&mut tray_icon)?;
 
+  // Threading
   let _ = std::thread::Builder::new()
     .name("Power_Thread".to_string())
     .spawn(power_thread);
@@ -174,21 +176,16 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
   loop {
     if unsafe { CONFIG.discord } {
-      // Get all output devices
       let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
 
-      // Check if there are multiple output devices
       if all_outputs.len() > 1 {
-        // Get the current default output device
         let current_output = get_default_device(&DeviceType::Output)?;
 
-        // Check if Discord is running and recording from default input device
         let programs = get_active_audio_applications(&DeviceType::Input)?;
 
         if programs.contains(&discord_executable) {
           connected = true;
 
-          // Switch to headphones if Discord is recording and speakers are the default
           if current_output.device_type == "Speakers" {
             let headphones = all_outputs
               .iter()
@@ -200,7 +197,6 @@ fn media_thread() -> Result<(), AudioDeviceError> {
         } else if connected {
           connected = false;
 
-          // Switch back to speakers if Discord is not recording and headphones are the default
           if current_output.device_type == "Headphones" {
             let headphones = all_outputs
               .iter()
@@ -223,15 +219,7 @@ fn connection_thread() -> Result<(), anyhow::Error> {
 
   loop {
     if unsafe { CONFIG.ethernet } {
-      let ethernet = is_ethernet_plugged_in();
-      let get_wifi_state = get_wifi_state()?;
-
-      if get_wifi_state && ethernet {
-        let _ = set_wifi_state(false);
-      }
-      if !get_wifi_state && !ethernet {
-        let _ = set_wifi_state(true);
-      }
+      let _ = set_wifi_state(!is_ethernet_plugged_in());
     }
 
     std::thread::sleep(Duration::from_secs(1));

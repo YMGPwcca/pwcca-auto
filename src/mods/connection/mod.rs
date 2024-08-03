@@ -2,46 +2,44 @@
 pub mod types;
 
 use types::{error::WlanHandlerError, wlan::Wlan};
-use windows::{
-  Devices::Radios::{self, Radio, RadioKind, RadioState},
-  Win32::{
-    Foundation::{ERROR_SUCCESS, HANDLE, WIN32_ERROR},
-    NetworkManagement::{
-      IpHelper::{
-        GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER,
-        GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST, IP_ADAPTER_ADDRESSES_LH,
-      },
-      Ndis::IfOperStatusUp,
-      WiFi::{
-        WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList,
-        WlanGetNetworkBssList, WlanOpenHandle, WLAN_AVAILABLE_NETWORK, WLAN_BSS_ENTRY,
-        WLAN_INTERFACE_INFO,
-      },
+use windows::Win32::{
+  Foundation::{ERROR_SUCCESS, HANDLE, WIN32_ERROR},
+  NetworkManagement::{
+    IpHelper::{
+      GetAdaptersAddresses, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER,
+      GAA_FLAG_SKIP_MULTICAST, GAA_FLAG_SKIP_UNICAST, IP_ADAPTER_ADDRESSES_LH,
+    },
+    Ndis::IfOperStatusUp,
+    WiFi::{
+      dot11_radio_state_off, dot11_radio_state_on, wlan_intf_opcode_radio_state, WlanCloseHandle,
+      WlanEnumInterfaces, WlanFreeMemory, WlanGetAvailableNetworkList, WlanGetNetworkBssList,
+      WlanOpenHandle, WlanSetInterface, WLAN_AVAILABLE_NETWORK, WLAN_BSS_ENTRY,
+      WLAN_INTERFACE_INFO, WLAN_PHY_RADIO_STATE,
     },
   },
 };
 
 fn open_handle() -> Result<HANDLE, WlanHandlerError> {
-  let mut w_handle = HANDLE::default();
+  let mut handle = HANDLE::default();
   let mut current_version = 0;
 
   let open_handle_result =
-    WIN32_ERROR(unsafe { WlanOpenHandle(2, None, &mut current_version, &mut w_handle) });
+    WIN32_ERROR(unsafe { WlanOpenHandle(2, None, &mut current_version, &mut handle) });
   if open_handle_result != ERROR_SUCCESS {
+    unsafe { WlanCloseHandle(handle, None) };
     return Err(WlanHandlerError::new(open_handle_result));
   }
-  Ok(w_handle)
+  Ok(handle)
 }
 
-fn enum_interfaces(w_handle: &HANDLE) -> Result<Vec<WLAN_INTERFACE_INFO>, WlanHandlerError> {
+fn enum_interfaces(handle: &HANDLE) -> Result<Vec<WLAN_INTERFACE_INFO>, WlanHandlerError> {
+  let mut interface_info_list = std::ptr::null_mut();
+
   unsafe {
-    let mut interface_info_list = std::ptr::null_mut();
-    let enum_interfaces_result = WIN32_ERROR(WlanEnumInterfaces(
-      *w_handle,
-      None,
-      &mut interface_info_list,
-    ));
+    let enum_interfaces_result =
+      WIN32_ERROR(WlanEnumInterfaces(*handle, None, &mut interface_info_list));
     if enum_interfaces_result != ERROR_SUCCESS {
+      WlanCloseHandle(*handle, None);
       return Err(WlanHandlerError::new(enum_interfaces_result));
     }
 
@@ -61,20 +59,21 @@ fn enum_interfaces(w_handle: &HANDLE) -> Result<Vec<WLAN_INTERFACE_INFO>, WlanHa
 }
 
 fn get_available_network_list(
-  w_handle: &HANDLE,
+  handle: &HANDLE,
   interface: &WLAN_INTERFACE_INFO,
 ) -> Result<Vec<WLAN_AVAILABLE_NETWORK>, WlanHandlerError> {
+  let mut available_network_list = std::ptr::null_mut();
+
   unsafe {
-    let mut available_network_list = std::ptr::null_mut();
-    let get_available_network_list_result = WIN32_ERROR(WlanGetAvailableNetworkList(
-      *w_handle,
+    let result = WIN32_ERROR(WlanGetAvailableNetworkList(
+      *handle,
       &interface.InterfaceGuid,
       0,
       None,
       &mut available_network_list,
     ));
-    if get_available_network_list_result != ERROR_SUCCESS {
-      return Err(WlanHandlerError::new(get_available_network_list_result));
+    if result != ERROR_SUCCESS {
+      return Err(WlanHandlerError::new(result));
     }
 
     // https://stackoverflow.com/a/78779478/9879620
@@ -91,14 +90,14 @@ fn get_available_network_list(
 }
 
 fn get_network_bss_list(
-  w_handle: &HANDLE,
+  handle: &HANDLE,
   interface: &WLAN_INTERFACE_INFO,
   network: &WLAN_AVAILABLE_NETWORK,
 ) -> Result<Vec<WLAN_BSS_ENTRY>, WlanHandlerError> {
   unsafe {
     let mut bssid_list = std::ptr::null_mut();
-    let get_network_bss_list_result = WIN32_ERROR(WlanGetNetworkBssList(
-      *w_handle,
+    let result = WIN32_ERROR(WlanGetNetworkBssList(
+      *handle,
       &interface.InterfaceGuid,
       Some(std::ptr::addr_of!(network.dot11Ssid)),
       network.dot11BssType,
@@ -106,8 +105,8 @@ fn get_network_bss_list(
       None,
       &mut bssid_list,
     ));
-    if get_network_bss_list_result != ERROR_SUCCESS {
-      return Err(WlanHandlerError::new(get_network_bss_list_result));
+    if result != ERROR_SUCCESS {
+      return Err(WlanHandlerError::new(result));
     }
 
     // https://stackoverflow.com/a/78779478/9879620
@@ -131,14 +130,15 @@ pub fn get_available_networks() -> Result<Vec<Wlan>, WlanHandlerError> {
   for interface in enum_interfaces(&handle)? {
     let available_network_list = get_available_network_list(&handle, &interface);
     if available_network_list.is_err() {
+      drop(available_network_list);
       continue;
     }
 
-    let available_network_list = get_available_network_list(&handle, &interface).unwrap();
+    let available_network_list = get_available_network_list(&handle, &interface)?;
     for network in &available_network_list {
       network_list.push(Wlan::new(
-        &network,
-        get_network_bss_list(&handle, &interface, &network)?,
+        network,
+        get_network_bss_list(&handle, &interface, network)?,
       ));
     }
     drop(available_network_list);
@@ -190,27 +190,33 @@ pub fn is_ethernet_plugged_in() -> bool {
   }
 }
 
-fn get_wifi_radio() -> Result<Radio, anyhow::Error> {
-  Ok(
-    Radios::Radio::GetRadiosAsync()?
-      .get()?
-      .into_iter()
-      .find(|e| e.Kind() == Ok(RadioKind::WiFi))
-      .expect("No WiFi radio found"),
-  )
-}
+pub fn set_wifi_state(on: bool) -> Result<(), WlanHandlerError> {
+  let handle = open_handle()?;
+  let enum_interfaces = enum_interfaces(&handle)?;
 
-pub fn get_wifi_state() -> Result<bool, anyhow::Error> {
-  let radio = get_wifi_radio()?;
-  Ok(match radio.State()? {
-    RadioState::On => true,
-    _ => false,
-  })
-}
+  let state = WLAN_PHY_RADIO_STATE {
+    dwPhyIndex: 0,
+    dot11SoftwareRadioState: if on {
+      dot11_radio_state_on
+    } else {
+      dot11_radio_state_off
+    },
+    ..Default::default()
+  };
 
-pub fn set_wifi_state(on: bool) -> Result<(), anyhow::Error> {
-  let radio = get_wifi_radio()?;
-  radio.SetStateAsync(if on { RadioState::On } else { RadioState::Off })?;
-  drop(radio);
+  for interface in enum_interfaces {
+    unsafe {
+      WlanSetInterface(
+        handle,
+        std::ptr::addr_of!(interface.InterfaceGuid),
+        wlan_intf_opcode_radio_state,
+        std::mem::size_of::<WLAN_PHY_RADIO_STATE>() as u32,
+        std::ptr::addr_of!(state) as *const std::ffi::c_void,
+        None,
+      );
+    }
+  }
+
+  unsafe { WlanCloseHandle(handle, None) };
   Ok(())
 }

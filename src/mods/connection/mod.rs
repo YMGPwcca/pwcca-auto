@@ -186,6 +186,7 @@ pub fn is_ethernet_plugged_in() -> bool {
 
     is_plugged_in
   } else {
+    drop(adapters_addresses_buffer);
     false
   }
 }

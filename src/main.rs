@@ -13,7 +13,9 @@ use mods::{
     get_default_device, init,
     types::{device::DeviceType, error::AudioDeviceError},
   },
-  power::{get_all_power_schemes, get_power_status, set_active_power_scheme},
+  power::{
+    get_active_power_scheme, get_all_power_schemes, get_power_status, set_active_power_scheme,
+  },
   taskbar::taskbar_automation,
 };
 
@@ -232,6 +234,7 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
 
   let mut on_battery_secs = 0;
   let all_power_schemes = get_all_power_schemes()?;
+  let power = unsafe { CONFIG.power };
 
   let powersaver = all_power_schemes
     .iter()
@@ -243,15 +246,17 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
     .unwrap();
 
   loop {
-    if on_battery_secs > unsafe { CONFIG.power.timer }
-      || get_power_status().remaining_percentage < unsafe { CONFIG.power.percentage }
-    {
+    let is_plugged_in = get_power_status().is_plugged_in;
+
+    if on_battery_secs > power.timer || get_power_status().remaining_percentage < power.percentage {
       set_active_power_scheme(&powersaver.guid)?;
-    } else {
+    }
+
+    if is_plugged_in && get_active_power_scheme()?.guid == powersaver.guid {
       set_active_power_scheme(&ultra.guid)?;
     }
 
-    if !get_power_status().is_plugged_in {
+    if !is_plugged_in {
       on_battery_secs += 1;
     } else {
       on_battery_secs = 0;

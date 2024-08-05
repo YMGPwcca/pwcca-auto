@@ -4,6 +4,7 @@ mod policy_config;
 pub mod types;
 
 use std::{path::Path, str::FromStr};
+
 use types::{
   device::{Device, DeviceType},
   error::{AudioDeviceError, ErrorEnum},

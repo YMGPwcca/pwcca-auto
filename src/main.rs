@@ -16,6 +16,7 @@ use mods::{
   power::{
     get_active_power_scheme, get_all_power_schemes, get_power_status, set_active_power_scheme,
   },
+  startup::{create_startup_task, delete_startup_task},
   taskbar::taskbar_automation,
 };
 
@@ -31,6 +32,8 @@ use windows::Win32::{
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 enum Events {
   LeftClickTrayIcon,
+
+  Startup,
 
   Discord,
   Ethernet,
@@ -48,6 +51,8 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
   tray_icon
     .set_menu(
       &MenuBuilder::new()
+        .checkable("Startup", unsafe { CONFIG.startup }, Events::Startup)
+        .separator()
         .checkable("Discord", unsafe { CONFIG.discord }, Events::Discord)
         .checkable("Ethernet", unsafe { CONFIG.ethernet }, Events::Ethernet)
         .checkable("Taskbar", unsafe { CONFIG.taskbar }, Events::Taskbar)
@@ -138,6 +143,17 @@ fn tray_thread(
   receiver.iter().for_each(|m| match m {
     Events::LeftClickTrayIcon => {
       tray_icon.show_menu().unwrap();
+    }
+    Events::Startup => {
+      unsafe { CONFIG.toggle_startup() };
+
+      if unsafe { CONFIG.startup } {
+        create_startup_task().expect("Cannot create startup task");
+      } else {
+        delete_startup_task().expect("Cannot delete startup task");
+      }
+
+      let _ = setup_tray_icon_menu(&mut tray_icon);
     }
     Events::Discord => {
       unsafe { CONFIG.toggle_discord() };

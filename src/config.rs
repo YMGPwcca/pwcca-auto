@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Config {
+  pub startup: bool,
+
   pub discord: bool,
   pub ethernet: bool,
   pub taskbar: bool,
@@ -21,6 +23,7 @@ pub struct Power {
 impl Config {
   pub const fn new() -> Self {
     Config {
+      startup: false,
       discord: false,
       ethernet: false,
       taskbar: false,
@@ -35,6 +38,10 @@ impl Config {
     let exe_path = std::env::current_exe()?;
     let config_path = std::path::Path::new(exe_path.parent().unwrap()).join("config.json");
     Ok(config_path)
+  }
+
+  pub fn toggle_startup(&mut self) {
+    self.startup = !self.startup;
   }
 
   pub fn toggle_discord(&mut self) {

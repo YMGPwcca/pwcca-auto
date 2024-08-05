@@ -3,6 +3,7 @@
 #![allow(non_upper_case_globals, non_snake_case)]
 
 use std::ffi::c_void;
+
 use windows::core::{IUnknown, HRESULT};
 use windows::core::{IUnknown_Vtbl, Interface, Result, GUID, PCWSTR};
 use windows::Win32::Media::Audio::ERole;

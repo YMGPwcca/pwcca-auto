@@ -99,6 +99,8 @@ pub fn get_default_device(device_type: &DeviceType) -> Result<Device, AudioDevic
         .map_err(|e| AudioDeviceError::new(ErrorEnum::DeviceNotFound, e))?,
     };
 
+    drop(enumerator);
+
     get_device_info(&device)
   }
 }
@@ -125,7 +127,12 @@ pub fn enumerate_audio_devices(device_type: &DeviceType) -> Result<Vec<Device>, 
         .Item(i)
         .map_err(|e| AudioDeviceError::new(ErrorEnum::DeviceNotFound, e))?;
       all_devices.push(get_device_info(&device)?);
+
+      drop(device);
     }
+
+    drop(enumerator);
+    drop(devices);
 
     Ok(all_devices)
   }
@@ -137,9 +144,13 @@ pub fn change_default_output(device_id: PWSTR) -> Result<(), AudioDeviceError> {
   unsafe {
     let policy = policy_config::IPolicyConfig::new()
       .map_err(|e| AudioDeviceError::new(ErrorEnum::InitializationFailed, e.into()))?;
-    policy
+    let result = policy
       .SetDefaultEndpoint(PCWSTR(device_id.as_ptr()), eConsole)
-      .map_err(|e| AudioDeviceError::new(ErrorEnum::SetDefaultEndpointFailed, e))
+      .map_err(|e| AudioDeviceError::new(ErrorEnum::SetDefaultEndpointFailed, e))?;
+
+    drop(policy);
+
+    Ok(result)
   }
 }
 
@@ -210,7 +221,14 @@ pub fn get_active_audio_applications(
           .map_err(|e| AudioDeviceError::new(ErrorEnum::GetProcessIdFailed, e))?;
         result.push(get_process_name(instance_id)?);
       }
+
+      drop(session_control);
+      drop(session_control2);
     }
+
+    drop(device);
+    drop(session_manager);
+    drop(session_list);
 
     Ok(result)
   }

@@ -29,6 +29,7 @@ fn open_handle() -> Result<HANDLE, WlanHandlerError> {
     unsafe { WlanCloseHandle(handle, None) };
     return Err(WlanHandlerError::new(open_handle_result));
   }
+
   Ok(handle)
 }
 
@@ -183,7 +184,6 @@ pub fn is_ethernet_plugged_in() -> bool {
     }
 
     drop(adapters_addresses_buffer);
-
     is_plugged_in
   } else {
     drop(adapters_addresses_buffer);

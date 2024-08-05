@@ -49,11 +49,13 @@ fn get_current_user() -> Result<String, anyhow::Error> {
 
   unsafe { GetUserNameW(PWSTR(buffer.as_mut_ptr()), &mut size) }?;
 
-  Ok(
-    std::ffi::OsString::from_wide(&buffer[..(size - 1) as usize])
-      .to_string_lossy()
-      .to_string(),
-  )
+  let username = std::ffi::OsString::from_wide(&buffer[..(size - 1) as usize])
+    .to_string_lossy()
+    .to_string();
+
+  drop(buffer);
+
+  Ok(username)
 }
 
 pub fn create_startup_task() -> Result<(), anyhow::Error> {

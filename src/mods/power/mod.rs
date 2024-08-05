@@ -55,11 +55,11 @@ pub fn get_all_power_schemes() -> Result<Vec<PowerScheme>, WIN32_ERROR> {
       }
 
       if result == ERROR_SUCCESS {
+        index += 1;
         power_schemes.push(PowerScheme {
           name: get_power_scheme_friendly_name(&buffer).unwrap(),
           guid: buffer,
         });
-        index += 1;
       } else {
         break;
       }

@@ -83,7 +83,7 @@ pub fn turn_off_monitor() {
     SendMessageW(
       GetForegroundWindow(),
       WM_SYSCOMMAND,
-      WPARAM(SC_MONITORPOWER.try_into().unwrap()),
+      WPARAM(SC_MONITORPOWER as usize),
       LPARAM(2isize),
     )
   };

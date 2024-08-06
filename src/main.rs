@@ -111,6 +111,8 @@ fn main() -> Result<()> {
   let system = System::new_all();
   if system.processes_by_name("PwccaAuto").count() > 1 {
     std::process::exit(0);
+  }
+
   // Check if the process is elevated
   if !is_elevated()? {
     unsafe {

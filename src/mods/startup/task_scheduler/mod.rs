@@ -9,8 +9,7 @@ use windows::{
     System::{
       Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_ALL},
       TaskScheduler::{
-        IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler, TASK_ACTION_EXEC,
-        TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_TRIGGER_LOGON,
+        IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler, TASK_ACTION_EXEC, TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST, TASK_TRIGGER_LOGON
       },
       WindowsProgramming::GetUserNameW,
     },
@@ -68,6 +67,9 @@ pub fn create_startup_task() -> Result<(), anyhow::Error> {
 
   unsafe {
     let definition = service.NewTask(0)?;
+
+    let principal = definition.Principal()?;
+    principal.SetRunLevel(TASK_RUNLEVEL_HIGHEST)?;
 
     let settings = definition.Settings()?;
     settings.SetStartWhenAvailable(VARIANT_TRUE)?;

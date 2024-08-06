@@ -16,7 +16,7 @@ use mods::{
   power::{
     get_active_power_scheme, get_all_power_schemes, get_power_status, set_active_power_scheme,
   },
-  startup::{create_startup_task, delete_startup_task},
+  startup::task_scheduler::{create_startup_task, delete_startup_task},
   taskbar::taskbar_automation,
 };
 
@@ -24,9 +24,17 @@ use anyhow::Result;
 use std::{mem::MaybeUninit, time::Duration};
 use sysinfo::System;
 use trayicon::{MenuBuilder, TrayIconBuilder};
-use windows::Win32::{
-  Foundation::{TRUE, WIN32_ERROR},
-  UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage},
+use windows::{
+  core::w,
+  Win32::{
+    Foundation::{HANDLE, HWND, TRUE, WIN32_ERROR},
+    Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
+    System::Threading::{GetCurrentProcess, OpenProcessToken},
+    UI::WindowsAndMessaging::{
+      DispatchMessageW, GetMessageW, MessageBoxW, TranslateMessage, MB_ICONERROR, MB_OK,
+      MB_SYSTEMMODAL,
+    },
+  },
 };
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -73,11 +81,48 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
   Ok(())
 }
 
+fn is_elevated() -> Result<bool> {
+  let mut elevated = false;
+  let mut token_handle = HANDLE::default();
+
+  unsafe {
+    if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle).is_ok() {
+      let mut elevation = TOKEN_ELEVATION::default();
+      let size = std::mem::size_of_val(&elevation) as u32;
+      let mut returnlength = 0;
+
+      GetTokenInformation(
+        token_handle,
+        TokenElevation,
+        Some(&mut elevation as *mut _ as *mut _),
+        size,
+        &mut returnlength,
+      )?;
+
+      elevated = elevation.TokenIsElevated != 0;
+    };
+  };
+
+  Ok(elevated)
+}
+
 fn main() -> Result<()> {
   // Check if another instance is running
   let system = System::new_all();
   if system.processes_by_name("PwccaAuto").count() > 1 {
     std::process::exit(0);
+  // Check if the process is elevated
+  if !is_elevated()? {
+    unsafe {
+      MessageBoxW(
+        HWND::default(),
+        w!("This application requires administrator privileges"),
+        w!("Error"),
+        MB_SYSTEMMODAL | MB_ICONERROR | MB_OK,
+      )
+    };
+
+    std::process::exit(1);
   }
 
   // Main application starts here

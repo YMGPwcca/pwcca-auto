@@ -27,7 +27,7 @@ use trayicon::{MenuBuilder, TrayIconBuilder};
 use windows::{
   core::w,
   Win32::{
-    Foundation::{HANDLE, HWND, TRUE, WIN32_ERROR},
+    Foundation::{CloseHandle, HANDLE, HWND, TRUE, WIN32_ERROR},
     Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
     System::Threading::{GetCurrentProcess, OpenProcessToken},
     UI::WindowsAndMessaging::{
@@ -91,16 +91,20 @@ fn is_elevated() -> Result<bool> {
       let size = std::mem::size_of_val(&elevation) as u32;
       let mut returnlength = 0;
 
-      GetTokenInformation(
+      if GetTokenInformation(
         token_handle,
         TokenElevation,
         Some(&mut elevation as *mut _ as *mut _),
         size,
         &mut returnlength,
-      )?;
-
-      elevated = elevation.TokenIsElevated != 0;
+      )
+      .is_ok()
+      {
+        elevated = elevation.TokenIsElevated != 0;
+      }
     };
+
+    let _ = CloseHandle(token_handle);
   };
 
   Ok(elevated)

@@ -2,6 +2,7 @@
 
 use std::os::windows::ffi::OsStringExt;
 
+use anyhow::Result;
 use windows::{
   core::{Interface, BSTR, PWSTR},
   Win32::{
@@ -9,14 +10,16 @@ use windows::{
     System::{
       Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_ALL},
       TaskScheduler::{
-        IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler, TASK_ACTION_EXEC, TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST, TASK_TRIGGER_LOGON
+        IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler, TASK_ACTION_EXEC,
+        TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST,
+        TASK_TRIGGER_LOGON,
       },
       WindowsProgramming::GetUserNameW,
     },
   },
 };
 
-fn init_com() -> Result<(), anyhow::Error> {
+fn init_com() -> Result<()> {
   let result = unsafe { CoInitialize(None) };
   if result.is_err() {
     unsafe { CoUninitialize() };
@@ -30,7 +33,7 @@ fn release_com() {
   unsafe { CoUninitialize() };
 }
 
-fn get_task_service() -> Result<ITaskService, anyhow::Error> {
+fn get_task_service() -> Result<ITaskService> {
   init_com()?;
 
   unsafe {
@@ -42,7 +45,7 @@ fn get_task_service() -> Result<ITaskService, anyhow::Error> {
   }
 }
 
-fn get_current_user() -> Result<String, anyhow::Error> {
+fn get_current_user() -> Result<String> {
   let mut size = 256;
   let mut buffer: Vec<u16> = vec![0; size as usize];
 
@@ -57,7 +60,7 @@ fn get_current_user() -> Result<String, anyhow::Error> {
   Ok(username)
 }
 
-pub fn create_startup_task() -> Result<(), anyhow::Error> {
+pub fn create_startup_task() -> Result<()> {
   let current_user = get_current_user()?;
 
   let exe_path = std::env::current_exe()?;
@@ -87,7 +90,7 @@ pub fn create_startup_task() -> Result<(), anyhow::Error> {
     reg_info.SetAuthor(&BSTR::from(&current_user))?;
     reg_info.SetDescription(&BSTR::from("Run with Windows"))?;
 
-    let folder: ITaskFolder = service.GetFolder(&BSTR::from("\\"))?;
+    let folder: ITaskFolder = service.GetFolder(&BSTR::from(r"\"))?;
     folder.RegisterTaskDefinition(
       &BSTR::from("PwccaAuto"),
       &definition,
@@ -112,11 +115,11 @@ pub fn create_startup_task() -> Result<(), anyhow::Error> {
   Ok(())
 }
 
-pub fn delete_startup_task() -> Result<(), anyhow::Error> {
+pub fn delete_startup_task() -> Result<()> {
   let service = get_task_service()?;
 
   unsafe {
-    let folder = service.GetFolder(&BSTR::from("\\"))?;
+    let folder = service.GetFolder(&BSTR::from(r"\"))?;
     folder.DeleteTask(&BSTR::from("PwccaAuto"), 0)?;
 
     drop(folder);

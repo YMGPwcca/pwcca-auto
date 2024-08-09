@@ -144,13 +144,13 @@ pub fn change_default_output(device_id: PWSTR) -> Result<(), AudioDeviceError> {
   unsafe {
     let policy = policy_config::IPolicyConfig::new()
       .map_err(|e| AudioDeviceError::new(ErrorEnum::InitializationFailed, e.into()))?;
-    let result = policy
+    policy
       .SetDefaultEndpoint(PCWSTR(device_id.as_ptr()), eConsole)
       .map_err(|e| AudioDeviceError::new(ErrorEnum::SetDefaultEndpointFailed, e))?;
 
     drop(policy);
 
-    Ok(result)
+    Ok(())
   }
 }
 

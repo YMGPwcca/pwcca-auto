@@ -16,13 +16,13 @@ use mods::{
   power::{
     get_active_power_scheme, get_all_power_schemes, get_power_status, set_active_power_scheme,
   },
+  process::get_processes_by_name,
   startup::task_scheduler::{create_startup_task, delete_startup_task},
   taskbar::taskbar_automation,
 };
 
 use anyhow::Result;
 use std::{mem::MaybeUninit, time::Duration};
-use sysinfo::System;
 use trayicon::{MenuBuilder, TrayIconBuilder};
 use windows::{
   core::w,
@@ -112,9 +112,17 @@ fn is_elevated() -> Result<bool> {
 
 fn main() -> Result<()> {
   // Check if another instance is running
-  let system = System::new_all();
-  if system.processes_by_name("PwccaAuto").count() > 1 {
-    std::process::exit(0);
+  if get_processes_by_name("PwccaAuto")?.len() > 1 {
+    unsafe {
+      MessageBoxW(
+        HWND::default(),
+        w!("Another instance is already running"),
+        w!("Error"),
+        MB_SYSTEMMODAL | MB_ICONERROR | MB_OK,
+      )
+    };
+
+    std::process::exit(1);
   }
 
   // Check if the process is elevated
@@ -142,7 +150,7 @@ fn main() -> Result<()> {
 
   // Tray icon
   let mut tray_icon = TrayIconBuilder::new()
-    .sender(move |e: &Events| sender.send(*e).unwrap())
+    .sender(move |e| sender.send(*e).unwrap())
     .icon_from_buffer(include_bytes!("../res/icon.ico"))
     .tooltip("Pwcca Auto")
     .on_click(Events::LeftClickTrayIcon)
@@ -282,7 +290,7 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   }
 }
 
-fn connection_thread() -> Result<(), anyhow::Error> {
+fn connection_thread() -> Result<()> {
   // Initialize the connection thread
   println!("  + Running Connection Thread");
 

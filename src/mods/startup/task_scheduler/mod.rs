@@ -1,10 +1,8 @@
 #![allow(dead_code)]
 
-use std::os::windows::ffi::OsStringExt;
-
 use anyhow::Result;
 use windows::{
-  core::{Interface, BSTR, PWSTR},
+  core::{Interface, BSTR},
   Win32::{
     Foundation::VARIANT_TRUE,
     System::{
@@ -14,7 +12,6 @@ use windows::{
         TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST,
         TASK_TRIGGER_LOGON,
       },
-      WindowsProgramming::GetUserNameW,
     },
   },
 };
@@ -45,23 +42,8 @@ fn get_task_service() -> Result<ITaskService> {
   }
 }
 
-fn get_current_user() -> Result<String> {
-  let mut size = 256;
-  let mut buffer: Vec<u16> = vec![0; size as usize];
-
-  unsafe { GetUserNameW(PWSTR(buffer.as_mut_ptr()), &mut size) }?;
-
-  let username = std::ffi::OsString::from_wide(&buffer[..(size - 1) as usize])
-    .to_string_lossy()
-    .to_string();
-
-  drop(buffer);
-
-  Ok(username)
-}
-
 pub fn create_startup_task() -> Result<()> {
-  let current_user = get_current_user()?;
+  let current_user = env!("USERNAME");
 
   let exe_path = std::env::current_exe()?;
   let exe_dir = exe_path.parent().unwrap();
@@ -84,10 +66,10 @@ pub fn create_startup_task() -> Result<()> {
     action.SetWorkingDirectory(&BSTR::from(exe_dir.to_string_lossy().to_string()))?;
 
     let trigger: ILogonTrigger = definition.Triggers()?.Create(TASK_TRIGGER_LOGON)?.cast()?;
-    trigger.SetUserId(&BSTR::from(&current_user))?;
+    trigger.SetUserId(&BSTR::from(current_user))?;
 
     let reg_info = definition.RegistrationInfo()?;
-    reg_info.SetAuthor(&BSTR::from(&current_user))?;
+    reg_info.SetAuthor(&BSTR::from(current_user))?;
     reg_info.SetDescription(&BSTR::from("Run with Windows"))?;
 
     let folder: ITaskFolder = service.GetFolder(&BSTR::from(r"\"))?;
@@ -109,7 +91,6 @@ pub fn create_startup_task() -> Result<()> {
     drop(folder);
   };
 
-  drop(current_user);
   drop(service);
 
   Ok(())

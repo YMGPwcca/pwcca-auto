@@ -78,6 +78,7 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
   unsafe {
     let _ = CONFIG.write();
   };
+
   Ok(())
 }
 
@@ -189,6 +190,7 @@ fn main() -> Result<()> {
       }
     }
   }
+
   Ok(())
 }
 

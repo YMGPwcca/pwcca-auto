@@ -1,11 +1,11 @@
 use anyhow::Result;
 use windows::{
-  core::{PCWSTR, PWSTR},
+  core::{HSTRING, PCWSTR, PWSTR},
   Win32::{
     Foundation::ERROR_SUCCESS,
     System::Registry::{
-      RegCloseKey, RegEnumKeyW, RegEnumValueW, RegGetValueW, RegOpenKeyExW, HKEY, KEY_READ,
-      KEY_WRITE, REG_VALUE_TYPE, RRF_RT_ANY,
+      RegCloseKey, RegEnumKeyW, RegEnumValueW, RegGetValueW, RegOpenKeyExW, RegSetValueExW, HKEY,
+      KEY_READ, KEY_WRITE, REG_BINARY, REG_VALUE_TYPE, RRF_RT_ANY,
     },
   },
 };
@@ -91,6 +91,18 @@ impl RegKey {
     }
 
     values
+  }
+
+  pub fn set_value(&self, name: &str, value: bool) {
+    let value = if value { [2] } else { [3] };
+
+    unsafe {
+      let result = RegSetValueExW(self.hkey, &HSTRING::from(name), 0, REG_BINARY, Some(&value));
+
+      if result != ERROR_SUCCESS {
+        println!("Error setting value: {}", result.to_hresult().message());
+      }
+    }
   }
 
   pub fn is_startup_enabled(&self, value: PCWSTR) -> Result<bool> {

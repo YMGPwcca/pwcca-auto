@@ -1,12 +1,13 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StartupKind {
+pub enum StartupGroup {
   User,
   System,
 }
 
 #[derive(Debug)]
 pub struct StartupState {
-  pub kind: StartupKind,
+  pub group: StartupGroup,
+  pub path: String,
   pub name: String,
   pub status: bool,
 }

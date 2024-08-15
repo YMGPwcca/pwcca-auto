@@ -5,35 +5,42 @@ use std::fs;
 use anyhow::Result;
 use types::{
   regkey::RegKey,
-  startup_status::{StartupKind, StartupState},
+  startup_status::{StartupGroup, StartupState},
 };
 use windows::{
   core::{HSTRING, PCWSTR},
   Win32::System::Registry::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE},
 };
 
-pub fn get_startup_items(kind: StartupKind) -> Result<Vec<StartupState>> {
-  let mut items = get_startup_items_in_registry(&kind)?;
-  items.append(&mut get_startup_items_in_folder(&kind)?);
+pub fn get_all_startup_items() -> Result<Vec<StartupState>> {
+  let mut items = get_startup_items(StartupGroup::User)?;
+  items.append(&mut get_startup_items(StartupGroup::System)?);
 
-  let states = get_startup_item_state(&kind, &items)?;
+  Ok(items)
+}
+
+pub fn get_startup_items(group: StartupGroup) -> Result<Vec<StartupState>> {
+  let mut items = get_startup_items_in_registry(&group)?;
+  items.append(&mut get_startup_items_in_folder(&group)?);
+
+  let states = get_startup_item_state(&group, &items)?;
 
   Ok(states)
 }
 
-fn get_startup_items_in_registry(kind: &StartupKind) -> Result<Vec<String>> {
+fn get_startup_items_in_registry(group: &StartupGroup) -> Result<Vec<String>> {
   let mut items = Vec::new();
 
-  let root = match kind {
-    StartupKind::User => HKEY_CURRENT_USER,
-    StartupKind::System => HKEY_LOCAL_MACHINE,
+  let root = match group {
+    StartupGroup::User => HKEY_CURRENT_USER,
+    StartupGroup::System => HKEY_LOCAL_MACHINE,
   };
 
-  let paths = match kind {
-    StartupKind::User => vec![
+  let paths = match group {
+    StartupGroup::User => vec![
       String::from(r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run\"), // Run
     ],
-    StartupKind::System => vec![
+    StartupGroup::System => vec![
       String::from(r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run\"), // Run
       String::from(r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run\"), // Run32
     ],
@@ -47,12 +54,12 @@ fn get_startup_items_in_registry(kind: &StartupKind) -> Result<Vec<String>> {
   Ok(items)
 }
 
-fn get_startup_items_in_folder(kind: &StartupKind) -> Result<Vec<String>> {
+fn get_startup_items_in_folder(group: &StartupGroup) -> Result<Vec<String>> {
   let mut items = Vec::new();
 
-  let dir_path = match kind {
-    StartupKind::User => std::env::var("APPDATA")?,
-    StartupKind::System => std::env::var("PROGRAMDATA")?,
+  let dir_path = match group {
+    StartupGroup::User => std::env::var("APPDATA")?,
+    StartupGroup::System => std::env::var("PROGRAMDATA")?,
   } + r"\Microsoft\Windows\Start Menu\Programs\Startup";
 
   let dir_items = fs::read_dir(dir_path)?;
@@ -64,12 +71,12 @@ fn get_startup_items_in_folder(kind: &StartupKind) -> Result<Vec<String>> {
   Ok(items)
 }
 
-fn get_startup_item_state(kind: &StartupKind, items: &[String]) -> Result<Vec<StartupState>> {
+fn get_startup_item_state(group: &StartupGroup, items: &[String]) -> Result<Vec<StartupState>> {
   let mut result: Vec<StartupState> = Vec::new();
 
-  let root = match kind {
-    StartupKind::User => HKEY_CURRENT_USER,
-    StartupKind::System => HKEY_LOCAL_MACHINE,
+  let root = match group {
+    StartupGroup::User => HKEY_CURRENT_USER,
+    StartupGroup::System => HKEY_LOCAL_MACHINE,
   };
 
   let approved_path =
@@ -93,7 +100,8 @@ fn get_startup_item_state(kind: &StartupKind, items: &[String]) -> Result<Vec<St
       let contain = items.contains(&String::from(&value));
       if contain {
         result.push(StartupState {
-          kind: *kind,
+          group: *group,
+          path: approved_path.clone() + &key,
           name: String::from(&value),
           status: data,
         });
@@ -102,4 +110,24 @@ fn get_startup_item_state(kind: &StartupKind, items: &[String]) -> Result<Vec<St
   }
 
   Ok(result)
+}
+
+pub fn set_startup_item_state(name: &str, status: bool) -> Result<()> {
+  let all = get_all_startup_items()?;
+
+  let find = all
+    .iter()
+    .find(|e| e.name == name)
+    .expect("Cannot find startup item");
+
+  let root = match find.group {
+    StartupGroup::User => HKEY_CURRENT_USER,
+    StartupGroup::System => HKEY_LOCAL_MACHINE,
+  };
+
+  let key = RegKey::open(root, PCWSTR(HSTRING::from(&find.path).as_ptr()))?;
+
+  key.set_value(name, status);
+
+  Ok(())
 }

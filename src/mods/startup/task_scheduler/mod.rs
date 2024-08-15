@@ -4,13 +4,13 @@ use anyhow::Result;
 use windows::{
   core::{Interface, BSTR},
   Win32::{
-    Foundation::VARIANT_TRUE,
+    Foundation::{VARIANT_FALSE, VARIANT_TRUE},
     System::{
       Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_ALL},
       TaskScheduler::{
         IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler, TASK_ACTION_EXEC,
-        TASK_CREATE_OR_UPDATE, TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST,
-        TASK_TRIGGER_LOGON,
+        TASK_CREATE_OR_UPDATE, TASK_INSTANCES_STOP_EXISTING, TASK_LOGON_INTERACTIVE_TOKEN,
+        TASK_RUNLEVEL_HIGHEST, TASK_TRIGGER_LOGON,
       },
     },
   },
@@ -60,6 +60,9 @@ pub fn create_startup_task() -> Result<()> {
     settings.SetStartWhenAvailable(VARIANT_TRUE)?;
     settings.SetExecutionTimeLimit(&BSTR::from("PT0S"))?;
     settings.SetPriority(4)?;
+    settings.SetDisallowStartIfOnBatteries(VARIANT_FALSE)?;
+    settings.SetStopIfGoingOnBatteries(VARIANT_FALSE)?;
+    settings.SetMultipleInstances(TASK_INSTANCES_STOP_EXISTING)?;
 
     let action: IExecAction = definition.Actions()?.Create(TASK_ACTION_EXEC)?.cast()?;
     action.SetPath(&BSTR::from(exe_path.to_string_lossy().to_string()))?;

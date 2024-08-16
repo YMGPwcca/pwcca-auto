@@ -17,13 +17,16 @@ use mods::{
     get_active_power_scheme, get_all_power_schemes, get_power_status, set_active_power_scheme,
   },
   process::get_processes_by_name,
-  startup::task_scheduler::{create_startup_task, delete_startup_task},
+  startup::{
+    registry::{get_all_startup_items, set_startup_item_state},
+    task_scheduler::{create_startup_task, delete_startup_task},
+  },
   taskbar::taskbar_automation,
 };
 
 use anyhow::Result;
 use std::{mem::MaybeUninit, time::Duration};
-use trayicon::{MenuBuilder, TrayIconBuilder};
+use trayicon::{MenuBuilder, TrayIcon, TrayIconBuilder};
 use windows::{
   core::w,
   Win32::{
@@ -59,7 +62,11 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
   tray_icon
     .set_menu(
       &MenuBuilder::new()
-        .checkable("Startup", unsafe { CONFIG.startup }, Events::Startup)
+        .checkable(
+          "Run with Windows",
+          unsafe { CONFIG.startup },
+          Events::Startup,
+        )
         .separator()
         .checkable("Discord", unsafe { CONFIG.discord }, Events::Discord)
         .checkable("Ethernet", unsafe { CONFIG.ethernet }, Events::Ethernet)
@@ -162,6 +169,9 @@ fn main() -> Result<()> {
 
   // Threading
   let _ = std::thread::Builder::new()
+    .name("Startup_Thread".to_string())
+    .spawn(startup_thread);
+  let _ = std::thread::Builder::new()
     .name("Power_Thread".to_string())
     .spawn(power_thread);
   let _ = std::thread::Builder::new()
@@ -194,10 +204,29 @@ fn main() -> Result<()> {
   Ok(())
 }
 
-fn tray_thread(
-  receiver: std::sync::mpsc::Receiver<Events>,
-  mut tray_icon: trayicon::TrayIcon<Events>,
-) {
+fn startup_thread() -> Result<()> {
+  // Initialize the tray thread
+  println!("  + Running Startup Thread");
+
+  loop {
+    let disallow = ["Discord", "WallpaperEngine", "Overwolf", "Joplin.lnk"];
+    let disallow: Vec<String> = disallow.iter().map(|s| s.to_string()).collect();
+
+    let is_plugged_in = get_power_status().is_plugged_in;
+    let startup_items = get_all_startup_items()?;
+
+    for item in startup_items {
+      if disallow.contains(&item.name) {
+        set_startup_item_state(&item.name, is_plugged_in)
+          .unwrap_or_else(|_| panic!("Cannot disable {} startup", item.name));
+      }
+    }
+
+    std::thread::sleep(Duration::from_secs(1));
+  }
+}
+
+fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: TrayIcon<Events>) {
   // Initialize the tray thread
   println!("  + Running Tray Thread");
 

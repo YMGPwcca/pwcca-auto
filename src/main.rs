@@ -19,7 +19,7 @@ use mods::{
   process::get_processes_by_name,
   startup::{
     registry::{get_all_startup_items, set_startup_item_state},
-    task_scheduler::{create_startup_task, delete_startup_task},
+    task_scheduler::TaskScheduler,
   },
   taskbar::taskbar_automation,
 };
@@ -230,6 +230,8 @@ fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: TrayI
   // Initialize the tray thread
   println!("  + Running Tray Thread");
 
+  let task_scheduler = TaskScheduler::new().expect("Cannot construct task scheduler");
+
   receiver.iter().for_each(|m| match m {
     Events::LeftClickTrayIcon => {
       tray_icon.show_menu().unwrap();
@@ -238,9 +240,9 @@ fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: TrayI
       unsafe { CONFIG.toggle_startup() };
 
       if unsafe { CONFIG.startup } {
-        create_startup_task().expect("Cannot create startup task");
+        let _ = task_scheduler.create_startup_task();
       } else {
-        delete_startup_task().expect("Cannot delete startup task");
+        let _ = task_scheduler.delete_startup_task();
       }
 
       let _ = setup_tray_icon_menu(&mut tray_icon);

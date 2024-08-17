@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::Result;
 use windows::Win32::{
   Foundation::{CloseHandle, HMODULE, MAX_PATH},

@@ -240,9 +240,9 @@ fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: TrayI
       unsafe { CONFIG.toggle_startup() };
 
       if unsafe { CONFIG.startup } {
-        let _ = task_scheduler.create_startup_task();
+        let _ = task_scheduler.create_startup_task("PwccaAuto");
       } else {
-        let _ = task_scheduler.delete_startup_task();
+        let _ = task_scheduler.delete_startup_task("PwccaAuto");
       }
 
       let _ = setup_tray_icon_menu(&mut tray_icon);

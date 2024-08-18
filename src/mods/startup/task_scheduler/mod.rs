@@ -8,9 +8,9 @@ use windows::{
     System::{
       Com::{CoCreateInstance, CoInitialize, CoUninitialize, CLSCTX_ALL},
       TaskScheduler::{
-        IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler as GUID, TASK_ACTION_EXEC,
-        TASK_CREATE_OR_UPDATE, TASK_INSTANCES_STOP_EXISTING, TASK_LOGON_INTERACTIVE_TOKEN,
-        TASK_RUNLEVEL_HIGHEST, TASK_TRIGGER_LOGON,
+        IExecAction, ILogonTrigger, ITaskFolder, ITaskService, TaskScheduler as GUID,
+        TASK_ACTION_EXEC, TASK_CREATE_OR_UPDATE, TASK_INSTANCES_STOP_EXISTING,
+        TASK_LOGON_INTERACTIVE_TOKEN, TASK_RUNLEVEL_HIGHEST, TASK_TRIGGER_LOGON,
       },
     },
   },
@@ -31,7 +31,7 @@ impl TaskScheduler {
     Ok(Self(service))
   }
 
-  pub fn create_startup_task(&self) -> Result<()> {
+  pub fn create_startup_task(&self, name: &str) -> Result<()> {
     let current_user = env!("USERNAME");
 
     let exe_path = std::env::current_exe()?;
@@ -64,7 +64,7 @@ impl TaskScheduler {
 
       let folder: ITaskFolder = self.0.GetFolder(&BSTR::from(r"\"))?;
       folder.RegisterTaskDefinition(
-        &BSTR::from("PwccaAuto"),
+        &BSTR::from(name),
         &definition,
         TASK_CREATE_OR_UPDATE.0,
         None,
@@ -84,10 +84,10 @@ impl TaskScheduler {
     Ok(())
   }
 
-  pub fn delete_startup_task(&self) -> Result<()> {
+  pub fn delete_startup_task(&self, name: &str) -> Result<()> {
     unsafe {
       let folder = self.0.GetFolder(&BSTR::from(r"\"))?;
-      folder.DeleteTask(&BSTR::from("PwccaAuto"), 0)?;
+      folder.DeleteTask(&BSTR::from(name), 0)?;
 
       drop(folder);
     }
@@ -95,7 +95,7 @@ impl TaskScheduler {
     Ok(())
   }
 
-  pub fn is_service_created(&self, name: &str) -> Result<bool> {
+  pub fn is_service_created(&self, name: &str) -> bool {
     unsafe {
       let folder = self
         .0
@@ -104,11 +104,11 @@ impl TaskScheduler {
       let task = folder.GetTask(&BSTR::from(name));
 
       if task.is_err() {
-        return Ok(false);
+        return false;
       }
     }
 
-    Ok(true)
+    true
   }
 }
 

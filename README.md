@@ -10,4 +10,4 @@ Features:
 - auto switch to power saver powerplan when battery is used for more than 5 minutes or battery is 60% or less
 - change display refresh rate (between max and 60hz)
 - turn on wifi if not using ethernet and vice versa
-- auto hide taskbar when app is in fullscreen/maximized mode
+- auto hide taskbar when no app is in fullscreen/maximized mode

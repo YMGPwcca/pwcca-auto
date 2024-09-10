@@ -17,29 +17,22 @@ use windows::Win32::{
   },
 };
 
-extern "system" fn enum_window(handle: HWND, lparam: LPARAM) -> BOOL {
-  unsafe {
-    let programs = &mut *(lparam.0 as *mut Vec<isize>);
-    if IsWindowVisible(handle) == TRUE && IsZoomed(handle) == TRUE {
-      programs.push(lparam.0);
-      return FALSE;
-    }
+static mut PROGRAMS: Vec<HWND> = Vec::new();
 
-    TRUE
+unsafe extern "system" fn enum_window(handle: HWND, _lparam: LPARAM) -> BOOL {
+  PROGRAMS = Vec::new();
+  
+  if IsWindowVisible(handle) == TRUE && IsZoomed(handle) == TRUE && !PROGRAMS.contains(&handle) {
+    PROGRAMS.push(handle);
+    return FALSE;
   }
+
+  TRUE
 }
 
 pub fn taskbar_automation() {
-  let programs: Vec<isize> = Vec::new();
-
-  unsafe {
-    let _ = EnumWindows(
-      Some(enum_window),
-      LPARAM(std::ptr::addr_of!(programs) as isize),
-    );
-  };
-  hide_taskbar(programs.is_empty());
-  drop(programs);
+  let _ = unsafe { EnumWindows(Some(enum_window), LPARAM(0)) };
+  hide_taskbar(unsafe { PROGRAMS.is_empty() });
 }
 
 fn hide_taskbar(hide: bool) {

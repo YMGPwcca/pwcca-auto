@@ -9,20 +9,26 @@ use windows::Win32::{
   },
 };
 
-pub fn get_processes() -> Result<Vec<u32>> {
+pub fn get_processes_exec_name() -> Result<Vec<String>> {
+  Ok(
+    get_processes()?
+      .iter()
+      .map(get_process_executable_name)
+      .filter(|p_name| !p_name.is_empty())
+      .collect(),
+  )
+}
+
+fn get_processes() -> Result<Vec<u32>> {
   let mut pids = [0; 2048];
   let mut size = 0;
 
-  unsafe {
-    let _ = EnumProcesses(pids.as_mut_ptr(), 2048, &mut size);
-  };
+  unsafe { EnumProcesses(pids.as_mut_ptr(), 2048, &mut size)? };
 
-  let pids = pids[0..(size / 4) as usize].to_vec();
-
-  Ok(pids)
+  Ok(pids[0..(size / 4) as usize].to_vec())
 }
 
-pub fn get_process_name(pid: &u32) -> String {
+fn get_process_executable_name(pid: &u32) -> String {
   unsafe {
     let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, *pid);
     if handle.is_ok() {
@@ -42,6 +48,7 @@ pub fn get_process_name(pid: &u32) -> String {
         GetModuleBaseNameW(handle, module, &mut lpbasename);
 
         return String::from_utf16_lossy(&lpbasename)
+          .to_lowercase()
           .split(".exe")
           .next()
           .unwrap()
@@ -61,8 +68,9 @@ pub fn get_processes_by_name(name: &str) -> Result<Vec<String>> {
   Ok(
     pids
       .iter()
-      .map(get_process_name)
+      .map(get_process_executable_name)
       .filter(|p_name| p_name == name)
+      .filter(|p_name| !p_name.is_empty())
       .collect(),
   )
 }

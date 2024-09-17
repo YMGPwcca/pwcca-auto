@@ -5,29 +5,49 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct PowerConfig {
+  pub enabled: bool,
+  pub timer: u32,
+  pub percentage: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+pub struct MicrophoneConfig {
+  pub enabled: bool,
+  pub include: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+pub struct TaskbarConfig {
+  pub enabled: bool,
+  pub include: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct Config {
   pub startup: bool,
 
-  pub discord: bool,
+  pub microphone: MicrophoneConfig,
   pub ethernet: bool,
-  pub taskbar: bool,
-  pub power: Power,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Power {
-  pub timer: u32,
-  pub percentage: u32,
+  pub taskbar: TaskbarConfig,
+  pub power: PowerConfig,
 }
 
 impl Config {
   pub const fn new() -> Self {
     Config {
       startup: false,
-      discord: false,
+      microphone: MicrophoneConfig {
+        enabled: false,
+        include: Vec::new(),
+      },
       ethernet: false,
-      taskbar: false,
-      power: Power {
+      taskbar: TaskbarConfig {
+        enabled: false,
+        include: Vec::new(),
+      },
+      power: PowerConfig {
+        enabled: false,
         timer: 300,
         percentage: 60,
       },
@@ -44,8 +64,11 @@ impl Config {
     self.startup = !self.startup;
   }
 
-  pub fn toggle_discord(&mut self) {
-    self.discord = !self.discord;
+  pub fn toggle_microphone(&mut self) {
+    self.microphone = MicrophoneConfig {
+      enabled: !self.microphone.enabled,
+      include: self.microphone.include.clone(),
+    };
   }
 
   pub fn toggle_ethernet(&mut self) {
@@ -53,16 +76,31 @@ impl Config {
   }
 
   pub fn toggle_taskbar(&mut self) {
-    self.taskbar = !self.taskbar;
+    self.taskbar = TaskbarConfig {
+      enabled: !self.taskbar.enabled,
+      include: self.taskbar.include.clone(),
+    };
+  }
+
+  pub fn toggle_power(&mut self) {
+    self.power = PowerConfig {
+      enabled: !self.power.enabled,
+      timer: self.power.timer,
+      percentage: self.power.percentage,
+    };
   }
 
   pub fn set_power(&mut self, timer: u32, percentage: u32) {
-    self.power = Power { timer, percentage };
+    self.power = PowerConfig {
+      enabled: self.power.enabled,
+      timer,
+      percentage,
+    };
   }
 
   pub fn write(&self) -> Result<Self> {
     std::fs::write(Config::get_path()?, self.stringify()?)?;
-    Ok(*self)
+    Ok(self.clone())
   }
 
   pub fn read() -> Result<Self> {
@@ -70,7 +108,9 @@ impl Config {
     if path.exists() {
       Ok(serde_json::from_str(&std::fs::read_to_string(path)?)?)
     } else {
-      Ok(Config::write(&Config::new())?)
+      let config = Config::new();
+      config.write()?;
+      Ok(config)
     }
   }
 

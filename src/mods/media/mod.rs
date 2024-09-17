@@ -175,7 +175,8 @@ fn get_process_name(process_id: u32) -> Result<String, AudioDeviceError> {
         .to_str()
         .unwrap_or_default(),
     )
-    .unwrap_or_default();
+    .unwrap_or_default()
+    .to_lowercase();
 
     return Ok(process_name);
   }

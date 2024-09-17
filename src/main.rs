@@ -68,9 +68,17 @@ fn setup_tray_icon_menu(tray_icon: &mut trayicon::TrayIcon<Events>) -> Result<()
           Events::Startup,
         )
         .separator()
-        .checkable("Discord", unsafe { CONFIG.discord }, Events::Discord)
+        .checkable(
+          "Microphone",
+          unsafe { CONFIG.microphone.enabled },
+          Events::Discord,
+        )
         .checkable("Ethernet", unsafe { CONFIG.ethernet }, Events::Ethernet)
-        .checkable("Taskbar", unsafe { CONFIG.taskbar }, Events::Taskbar)
+        .checkable(
+          "Taskbar",
+          unsafe { CONFIG.taskbar.enabled },
+          Events::Taskbar,
+        )
         .separator()
         .item("Turn off monitor", Events::TurnOffMonitor)
         .item(
@@ -248,7 +256,7 @@ fn tray_thread(receiver: std::sync::mpsc::Receiver<Events>, mut tray_icon: TrayI
       let _ = setup_tray_icon_menu(&mut tray_icon);
     }
     Events::Discord => {
-      unsafe { CONFIG.toggle_discord() };
+      unsafe { CONFIG.toggle_microphone() };
       let _ = setup_tray_icon_menu(&mut tray_icon);
     }
     Events::Ethernet => {
@@ -282,10 +290,11 @@ fn media_thread() -> Result<(), AudioDeviceError> {
   init()?;
 
   let mut connected = false;
-  let discord_executable = String::from("Discord.exe");
 
   loop {
-    if unsafe { CONFIG.discord } {
+    if unsafe { CONFIG.microphone.enabled } {
+      let config_includes = unsafe { &CONFIG.microphone.include };
+
       let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
 
       if all_outputs.len() > 1 {
@@ -293,7 +302,7 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
         let programs = get_active_audio_applications(&DeviceType::Input)?;
 
-        if programs.contains(&discord_executable) {
+        if config_includes.iter().any(|e| programs.contains(e)) {
           connected = true;
 
           if current_output.device_type == "Speakers" {
@@ -354,20 +363,23 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
     .unwrap();
 
   loop {
-    let is_plugged_in = get_power_status().is_plugged_in;
+    if power.enabled {
+      let is_plugged_in = get_power_status().is_plugged_in;
 
-    if on_battery_secs > power.timer || get_power_status().remaining_percentage < power.percentage {
-      set_active_power_scheme(&powersaver.guid)?;
-    }
+      if on_battery_secs > power.timer || get_power_status().remaining_percentage < power.percentage
+      {
+        set_active_power_scheme(&powersaver.guid)?;
+      }
 
-    if is_plugged_in && get_active_power_scheme()?.guid == powersaver.guid {
-      set_active_power_scheme(&ultra.guid)?;
-    }
+      if is_plugged_in && get_active_power_scheme()?.guid == powersaver.guid {
+        set_active_power_scheme(&ultra.guid)?;
+      }
 
-    if !is_plugged_in {
-      on_battery_secs += 1;
-    } else {
-      on_battery_secs = 0;
+      if !is_plugged_in {
+        on_battery_secs += 1;
+      } else {
+        on_battery_secs = 0;
+      }
     }
 
     std::thread::sleep(Duration::from_secs(1));
@@ -379,7 +391,7 @@ fn taskbar_thread() {
   println!("  + Running Taskbar Thread");
 
   loop {
-    if unsafe { CONFIG.taskbar } {
+    if unsafe { CONFIG.taskbar.enabled } {
       taskbar_automation();
     }
 

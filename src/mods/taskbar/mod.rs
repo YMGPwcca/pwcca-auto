@@ -2,32 +2,76 @@
 
 pub mod types;
 
+use std::{path::Path, str::FromStr};
+
 use types::TaskbarSize;
 use windows::Win32::{
-  Foundation::{BOOL, FALSE, HWND, LPARAM, RECT, TRUE},
+  Foundation::{CloseHandle, BOOL, FALSE, HWND, LPARAM, MAX_PATH, RECT, TRUE},
   Graphics::Gdi::{EnumDisplaySettingsW, DEVMODEW, ENUM_CURRENT_SETTINGS},
+  System::{
+    ProcessStatus::GetProcessImageFileNameW,
+    Threading::{OpenProcess, PROCESS_ALL_ACCESS},
+  },
   UI::{
     Shell::{
       SHAppBarMessage, ABM_GETSTATE, ABM_SETSTATE, ABS_ALWAYSONTOP, ABS_AUTOHIDE, APPBARDATA,
     },
     WindowsAndMessaging::{
-      EnumWindows, IsWindowVisible, IsZoomed, SystemParametersInfoW, SPI_GETWORKAREA,
-      SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+      EnumWindows, GetWindowThreadProcessId, IsWindowVisible, IsZoomed, SystemParametersInfoW,
+      SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
     },
   },
 };
+
+use crate::CONFIG;
 
 static mut PROGRAMS: Vec<HWND> = Vec::new();
 
 unsafe extern "system" fn enum_window(handle: HWND, _lparam: LPARAM) -> BOOL {
   PROGRAMS = Vec::new();
-  
+
   if IsWindowVisible(handle) == TRUE && IsZoomed(handle) == TRUE && !PROGRAMS.contains(&handle) {
-    PROGRAMS.push(handle);
-    return FALSE;
+    let mut process_id = 0;
+    unsafe { GetWindowThreadProcessId(handle, Some(&mut process_id)) };
+
+    let process_name = get_process_name(process_id);
+    if CONFIG.taskbar.include.contains(&process_name) {
+      PROGRAMS.push(handle);
+      return FALSE;
+    }
   }
 
   TRUE
+}
+
+fn get_process_name(process_id: u32) -> String {
+  let h_process = unsafe { OpenProcess(PROCESS_ALL_ACCESS, false, process_id) }.unwrap_or_default();
+
+  if !h_process.is_invalid() {
+    let mut process_path_buffer = [0; MAX_PATH as usize];
+    let byte_written = unsafe { GetProcessImageFileNameW(h_process, &mut process_path_buffer) };
+
+    unsafe { CloseHandle(h_process).unwrap() };
+    if byte_written == 0 {
+      return String::new();
+    };
+
+    let process_path =
+      String::from_utf16(&process_path_buffer[..byte_written as usize]).unwrap_or_default();
+    let process_name = String::from_str(
+      Path::new(&process_path)
+        .file_name()
+        .unwrap_or_default()
+        .to_str()
+        .unwrap_or_default(),
+    )
+    .unwrap_or_default()
+    .to_lowercase();
+
+    return process_name;
+  }
+
+  String::new()
 }
 
 pub fn taskbar_automation() {

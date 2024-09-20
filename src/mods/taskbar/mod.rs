@@ -35,7 +35,7 @@ unsafe extern "system" fn enum_window(handle: HWND, _lparam: LPARAM) -> BOOL {
     unsafe { GetWindowThreadProcessId(handle, Some(&mut process_id)) };
 
     let process_name = get_process_name(process_id);
-    if CONFIG.taskbar.include.contains(&process_name) {
+    if CONFIG.taskbar.apps.contains(&process_name) {
       PROGRAMS.push(handle);
       return FALSE;
     }

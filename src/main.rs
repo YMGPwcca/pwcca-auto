@@ -293,7 +293,7 @@ fn media_thread() -> Result<(), AudioDeviceError> {
 
   loop {
     if unsafe { CONFIG.microphone.enabled } {
-      let config_includes = unsafe { &CONFIG.microphone.include };
+      let config_includes = unsafe { &CONFIG.microphone.apps };
 
       let all_outputs = enumerate_audio_devices(&DeviceType::Output)?;
 

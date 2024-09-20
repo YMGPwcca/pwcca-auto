@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct MicrophoneConfig {
   pub enabled: bool,
-  pub include: Vec<String>,
+  pub apps: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -20,13 +20,13 @@ pub struct PowerConfig {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct AutoStartConfig {
   pub enabled: bool,
-  pub include: Vec<String>,
+  pub apps: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct TaskbarConfig {
   pub enabled: bool,
-  pub include: Vec<String>,
+  pub apps: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
@@ -52,7 +52,7 @@ impl Config {
       // Configs
       microphone: MicrophoneConfig {
         enabled: false,
-        include: Vec::new(),
+        apps: Vec::new(),
       },
       power: PowerConfig {
         enabled: false,
@@ -61,11 +61,11 @@ impl Config {
       },
       autostart: AutoStartConfig {
         enabled: false,
-        include: Vec::new(),
+        apps: Vec::new(),
       },
       taskbar: TaskbarConfig {
         enabled: false,
-        include: Vec::new(),
+        apps: Vec::new(),
       },
     }
   }
@@ -89,7 +89,7 @@ impl Config {
   pub fn toggle_microphone(&mut self) {
     self.microphone = MicrophoneConfig {
       enabled: !self.microphone.enabled,
-      include: self.microphone.include.clone(),
+      apps: self.microphone.apps.clone(),
     };
   }
 
@@ -104,14 +104,14 @@ impl Config {
   pub fn toggle_autostart(&mut self) {
     self.autostart = AutoStartConfig {
       enabled: !self.autostart.enabled,
-      include: self.autostart.include.clone(),
+      apps: self.autostart.apps.clone(),
     };
   }
 
   pub fn toggle_taskbar(&mut self) {
     self.taskbar = TaskbarConfig {
       enabled: !self.taskbar.enabled,
-      include: self.taskbar.include.clone(),
+      apps: self.taskbar.apps.clone(),
     };
   }
 

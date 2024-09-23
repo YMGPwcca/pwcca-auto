@@ -366,7 +366,13 @@ fn power_thread() -> Result<(), WIN32_ERROR> {
     if power.enabled {
       let is_plugged_in = get_power_status().is_plugged_in;
 
-      if on_battery_secs > power.timer || get_power_status().remaining_percentage < power.percentage
+      if power.timer != 0 && on_battery_secs > power.timer {
+        set_active_power_scheme(&powersaver.guid)?;
+      }
+
+      if power.percentage != 0
+        && !is_plugged_in
+        && get_power_status().remaining_percentage < power.percentage
       {
         set_active_power_scheme(&powersaver.guid)?;
       }

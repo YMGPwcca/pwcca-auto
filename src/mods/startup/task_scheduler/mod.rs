@@ -57,10 +57,11 @@ impl TaskScheduler {
 
       let trigger: ILogonTrigger = definition.Triggers()?.Create(TASK_TRIGGER_LOGON)?.cast()?;
       trigger.SetUserId(&BSTR::from(current_user))?;
+      trigger.SetDelay(&BSTR::from("PT3S"))?;
 
       let reg_info = definition.RegistrationInfo()?;
       reg_info.SetAuthor(&BSTR::from(current_user))?;
-      reg_info.SetDescription(&BSTR::from("Run with Windows"))?;
+      reg_info.SetDescription(&BSTR::from("Run PwccaAuto with Windows"))?;
 
       let folder: ITaskFolder = self.0.GetFolder(&BSTR::from(r"\"))?;
       folder.RegisterTaskDefinition(

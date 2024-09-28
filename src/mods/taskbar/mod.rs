@@ -6,20 +6,17 @@ use std::{path::Path, str::FromStr};
 
 use types::TaskbarSize;
 use windows::Win32::{
-  Foundation::{CloseHandle, BOOL, FALSE, HWND, LPARAM, MAX_PATH, RECT, TRUE},
-  Graphics::Gdi::{EnumDisplaySettingsW, DEVMODEW, ENUM_CURRENT_SETTINGS},
+  Foundation::{CloseHandle, BOOL, FALSE, HWND, LPARAM, MAX_PATH, TRUE},
   System::{
     ProcessStatus::GetProcessImageFileNameW,
     Threading::{OpenProcess, PROCESS_ALL_ACCESS},
   },
   UI::{
     Shell::{
-      SHAppBarMessage, ABM_GETSTATE, ABM_SETSTATE, ABS_ALWAYSONTOP, ABS_AUTOHIDE, APPBARDATA,
+      SHAppBarMessage, ABM_GETSTATE, ABM_GETTASKBARPOS, ABM_SETSTATE, ABS_ALWAYSONTOP,
+      ABS_AUTOHIDE, APPBARDATA,
     },
-    WindowsAndMessaging::{
-      EnumWindows, GetWindowThreadProcessId, IsWindowVisible, IsZoomed, SystemParametersInfoW,
-      SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    },
+    WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId, IsWindowVisible, IsZoomed},
   },
 };
 
@@ -91,31 +88,16 @@ fn hide_taskbar(hide: bool) {
 }
 
 pub fn get_taskbar_size() -> TaskbarSize {
-  let mut workarea = RECT::default();
-  let mut screen_size = DEVMODEW::default();
-
   let mut taskbar = TaskbarSize::default();
-
-  unsafe {
-    SystemParametersInfoW(
-      SPI_GETWORKAREA,
-      0,
-      Some(std::ptr::addr_of_mut!(workarea) as _),
-      SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-    )
-    .expect("Cannot get work area size");
-
-    EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, &mut screen_size)
-      .expect("Cannot get screen size");
+  let mut pdata = APPBARDATA {
+    cbSize: std::mem::size_of::<APPBARDATA>() as u32,
+    ..APPBARDATA::default()
   };
 
-  if workarea.bottom != screen_size.dmPelsHeight as i32 {
-    taskbar.height = screen_size.dmPelsHeight - workarea.bottom as u32;
-  }
+  unsafe { SHAppBarMessage(ABM_GETTASKBARPOS, &mut pdata) };
 
-  if workarea.right != screen_size.dmPelsWidth as i32 {
-    taskbar.width = screen_size.dmPelsWidth - workarea.right as u32;
-  }
+  taskbar.height = (pdata.rc.bottom - pdata.rc.top) as u32;
+  taskbar.width = (pdata.rc.right - pdata.rc.left) as u32;
 
   taskbar
 }

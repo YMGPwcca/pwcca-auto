@@ -69,7 +69,7 @@ pub fn get_processes_by_name(name: &str) -> Result<Vec<String>> {
     pids
       .iter()
       .map(get_process_executable_name)
-      .filter(|p_name| p_name == name)
+      .filter(|p_name| p_name == &name.to_lowercase())
       .filter(|p_name| !p_name.is_empty())
       .collect(),
   )

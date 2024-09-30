@@ -12,6 +12,7 @@ use windows::{
   },
 };
 
+#[derive(Debug)]
 pub struct RegKey {
   hkey: HKEY,
   root: HKEY,
@@ -95,7 +96,7 @@ impl RegKey {
     values
   }
 
-  pub fn set_value(&self, name: &str, value: bool) {
+  pub fn set_value_data(&self, name: &str, value: bool) {
     let value = if value { [2] } else { [3] };
 
     unsafe {
@@ -105,6 +106,33 @@ impl RegKey {
         println!("Error setting value: {}", result.to_hresult().message());
       }
     }
+  }
+
+  pub fn get_value_data(&self, name: &str) -> Result<String> {
+    let mut size = 2048;
+    let mut buffer: [u16; 2048] = [0; 2048];
+
+    unsafe {
+      let result = RegGetValueW(
+        self.hkey,
+        None,
+        &HSTRING::from(name),
+        RRF_RT_ANY,
+        None,
+        Some(std::ptr::addr_of_mut!(buffer) as _),
+        Some(std::ptr::addr_of_mut!(size) as _),
+      );
+
+      if result != ERROR_SUCCESS {
+        println!("Error getting value: {}", result.to_hresult().message());
+      }
+    }
+
+    let a = String::from_utf16_lossy(&buffer)
+      .trim_matches(char::from(0))
+      .to_string();
+
+    Ok(a)
   }
 
   pub fn is_startup_enabled(&self, value: PCWSTR) -> Result<bool> {

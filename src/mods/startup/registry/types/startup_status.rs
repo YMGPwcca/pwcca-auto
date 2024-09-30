@@ -8,10 +8,26 @@ pub enum StartupGroup {
   System,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StartupKind {
+  Registry,
+  Folder,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct StartupState {
+pub struct StartupItem {
+  pub kind: StartupKind,
   pub group: StartupGroup,
   pub path: String,
   pub name: String,
-  pub status: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StartupState {
+  pub kind: StartupKind,
+  pub group: StartupGroup,
+  pub path: String,
+  pub state_path: String,
+  pub name: String,
+  pub state: bool,
 }

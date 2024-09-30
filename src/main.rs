@@ -223,9 +223,9 @@ fn startup_thread() -> Result<()> {
     let is_plugged_in = get_power_status().is_plugged_in;
     let startup_items = get_all_startup_items()?;
 
-    for item in startup_items {
+    for item in &startup_items {
       if disallow.contains(&item.name) {
-        set_startup_item_state(&item.name, is_plugged_in)
+        set_startup_item_state(item, is_plugged_in)
           .unwrap_or_else(|_| panic!("Cannot disable {} startup", item.name));
       }
     }

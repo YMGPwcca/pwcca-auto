@@ -128,11 +128,24 @@ impl RegKey {
       }
     }
 
-    let a = String::from_utf16_lossy(&buffer)
+    let data = String::from_utf16_lossy(&buffer)
       .trim_matches(char::from(0))
       .to_string();
 
-    Ok(a)
+    if data.starts_with('"') {
+      return Ok(data);
+    }
+
+    let split = data.split(" ").collect::<Vec<&str>>();
+    let mut length = split.len() - 1;
+    loop {
+      let maybe_path = split[..length].join(" ");
+      if std::path::Path::new(&maybe_path).exists() {
+        let maybe_arg = data.split_at(maybe_path.len()).1;
+        return Ok(format!("\"{}\"{}", maybe_path, maybe_arg));
+      }
+      length -= 1;
+    }
   }
 
   pub fn is_startup_enabled(&self, value: PCWSTR) -> Result<bool> {

@@ -40,8 +40,8 @@ pub fn get_startup_item_value(item: &StartupState) -> Result<String> {
     let key = RegKey::open(root, PCWSTR(HSTRING::from(&item.path).as_ptr()))?;
     return key.get_value_data(&item.name);
   }
-
-  Ok(item.path.clone())
+  
+  Ok(format!("\"{}\\{}\"", item.path, item.name))
 }
 
 fn get_startup_items_in_registry(group: &StartupGroup) -> Result<Vec<StartupItem>> {

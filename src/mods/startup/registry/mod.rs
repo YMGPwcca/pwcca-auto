@@ -30,7 +30,7 @@ pub fn get_startup_items_by_group(group: StartupGroup) -> Result<Vec<StartupStat
   Ok(states)
 }
 
-pub fn get_startup_item_value(item: &StartupState) -> Result<String> {
+pub fn get_startup_item_value(item: &StartupState) -> Result<(String, Option<String>)> {
   let root = match item.group {
     StartupGroup::User => HKEY_CURRENT_USER,
     StartupGroup::System => HKEY_LOCAL_MACHINE,
@@ -40,8 +40,8 @@ pub fn get_startup_item_value(item: &StartupState) -> Result<String> {
     let key = RegKey::open(root, PCWSTR(HSTRING::from(&item.path).as_ptr()))?;
     return key.get_value_data(&item.name);
   }
-  
-  Ok(format!("\"{}\\{}\"", item.path, item.name))
+
+  Ok((format!("\"{}\\{}\"", item.path, item.name), None))
 }
 
 fn get_startup_items_in_registry(group: &StartupGroup) -> Result<Vec<StartupItem>> {

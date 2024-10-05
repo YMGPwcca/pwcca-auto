@@ -108,7 +108,7 @@ impl RegKey {
     }
   }
 
-  pub fn get_value_data(&self, name: &str) -> Result<String> {
+  pub fn get_value_data(&self, name: &str) -> Result<(String, Option<String>)> {
     let mut size = 2048;
     let mut buffer: [u16; 2048] = [0; 2048];
 
@@ -130,19 +130,16 @@ impl RegKey {
 
     let data = String::from_utf16_lossy(&buffer)
       .trim_matches(char::from(0))
+      .replace("\"", "")
       .to_string();
-
-    if data.starts_with('"') {
-      return Ok(data);
-    }
 
     let split = data.split(" ").collect::<Vec<&str>>();
     let mut length = split.len() - 1;
     loop {
       let maybe_path = split[..length].join(" ");
       if std::path::Path::new(&maybe_path).exists() {
-        let maybe_arg = data.split_at(maybe_path.len()).1;
-        return Ok(format!("\"{}\"{}", maybe_path, maybe_arg));
+        let maybe_arg = data.split_at(maybe_path.len()).1.to_string();
+        return Ok((maybe_path, Some(maybe_arg)));
       }
       length -= 1;
     }

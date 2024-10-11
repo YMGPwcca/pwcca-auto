@@ -1,3 +1,5 @@
+# Moved to [PwccaAutoGUI](https://github.com/YMGPwcca/pwcca-auto-gui)
+
 <h1>Memory leaks are inevitable. Use with caution!</h1>
 * * *
 <h2>This is a automation program I made for personal use and to learn Rust.</h2>
